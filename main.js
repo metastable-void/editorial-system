@@ -60,6 +60,13 @@ const appState = {
   selectedAuthorId: null,
 };
 
+function normalizeUsers(users) {
+  return (Array.isArray(users) ? users : []).map((user) => ({
+    ...user,
+    id: Number(user.id),
+  }));
+}
+
 function sanitizeUrl(raw) {
   const trimmed = raw.trim();
   if (trimmed === '') {
@@ -178,7 +185,7 @@ function renderUsersPage(container) {
     setStatus(status, '作成中...', 'info');
     try {
       const created = await api.createUser(name);
-      appState.users = [...appState.users, created];
+      appState.users = [...appState.users, ...normalizeUsers([created])];
       input.value = '';
       setStatus(status, '作成しました。', 'success');
       renderApp();
@@ -559,7 +566,7 @@ async function init() {
   }
   try {
     const result = await api.getUsers();
-    appState.users = result.users || [];
+    appState.users = normalizeUsers(result.users);
     if (!hasCached && !appState.selectedAuthorId && appState.users.length > 0) {
       appState.selectedAuthorId = appState.users[0].id;
     }
