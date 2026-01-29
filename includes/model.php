@@ -101,11 +101,12 @@ class Model {
         }
 
         $placeholders = implode(',', array_fill(0, count($keywords), '?'));
-        $sql = "select distinct s.id, s.title, s.url, s.comment, s.author_id, u.name as author_name, sk.keyword as keyword
+        $sql = "select s.id, s.title, s.url, s.comment, s.author_id, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator ',') as keywords
             from sources s
             join users u on u.id = s.author_id
             join sources_keywords sk on sk.source_id = s.id
             where sk.keyword in ($placeholders) and s.state = ?
+            group by s.id, s.title, s.url, s.comment, s.author_id, u.name
             order by s.id desc";
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {

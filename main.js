@@ -282,9 +282,17 @@ function renderNewSourcePage(container) {
       box.appendChild(createElement('h3', { text: 'キーワード一致 (警告)' }));
       const grouped = new Map();
       keywordMatches.forEach((match) => {
-        const key = match.id ? String(match.id) : `${match.url || ''}||${match.title || ''}||${match.author_id || ''}`;
+        const idValue = match.id !== undefined && match.id !== null ? String(match.id) : '';
+        const key = idValue !== '' ? idValue : `${match.url || ''}||${match.title || ''}||${match.author_id || ''}`;
         if (!grouped.has(key)) {
           grouped.set(key, { ...match, keywords: [] });
+        }
+        if (match.keywords) {
+          const split = String(match.keywords)
+            .split(',')
+            .map((keyword) => keyword.trim())
+            .filter((keyword) => keyword !== '');
+          grouped.get(key).keywords.push(...split);
         }
         if (match.keyword) {
           grouped.get(key).keywords.push(match.keyword);
@@ -293,8 +301,15 @@ function renderNewSourcePage(container) {
       grouped.forEach((match) => {
         const item = createElement('div', { className: 'match-item' });
         item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
-        const keywordLabel = match.keywords.length > 0 ? ` / ${[...new Set(match.keywords)].join(', ')}` : '';
-        item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'}${keywordLabel}` }));
+        item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'}` }));
+        const uniqueKeywords = [...new Set(match.keywords)].filter((keyword) => keyword !== '');
+        if (uniqueKeywords.length > 0) {
+          const chips = createElement('div', { className: 'keyword-list' });
+          uniqueKeywords.forEach((keyword) => {
+            chips.appendChild(createElement('span', { className: 'chip', text: keyword }));
+          });
+          item.appendChild(chips);
+        }
         box.appendChild(item);
       });
       matchSection.appendChild(box);
