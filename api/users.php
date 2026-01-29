@@ -25,22 +25,26 @@ function read_json_body(): array {
     return $decoded;
 }
 
-$model = new Model(Config::getMysqlConfig(), Config::getOpenAiConfig());
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+try {
+    $model = new Model(Config::getMysqlConfig(), Config::getOpenAiConfig());
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-if ($method === 'GET') {
-    $users = $model->get_users();
-    json_response(['users' => $users]);
-}
-
-if ($method === 'POST') {
-    $data = read_json_body();
-    $name = $data['name'] ?? null;
-    if (!\is_string($name) || \trim($name) === '') {
-        json_response(['error' => 'Missing or invalid name.'], 400);
+    if ($method === 'GET') {
+        $users = $model->get_users();
+        json_response(['users' => $users]);
     }
-    $user = $model->add_user($name);
-    json_response($user, 201);
-}
 
-json_response(['error' => 'Method not allowed.'], 405);
+    if ($method === 'POST') {
+        $data = read_json_body();
+        $name = $data['name'] ?? null;
+        if (!\is_string($name) || \trim($name) === '') {
+            json_response(['error' => 'Missing or invalid name.'], 400);
+        }
+        $user = $model->add_user($name);
+        json_response($user, 201);
+    }
+
+    json_response(['error' => 'Method not allowed.'], 405);
+} catch (\Throwable $error) {
+    json_response(['error' => $error->getMessage()], 400);
+}

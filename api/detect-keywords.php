@@ -25,17 +25,21 @@ function read_json_body(): array {
     return $decoded;
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-    json_response(['error' => 'Method not allowed.'], 405);
-}
+try {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        json_response(['error' => 'Method not allowed.'], 405);
+    }
 
-$data = read_json_body();
-$title = $data['title'] ?? '';
-$comment = $data['comment'] ?? '';
-if (!\is_string($title) || !\is_string($comment)) {
-    json_response(['error' => 'Invalid title or comment.'], 400);
-}
+    $data = read_json_body();
+    $title = $data['title'] ?? '';
+    $comment = $data['comment'] ?? '';
+    if (!\is_string($title) || !\is_string($comment)) {
+        json_response(['error' => 'Invalid title or comment.'], 400);
+    }
 
-$model = new Model(Config::getMysqlConfig(), Config::getOpenAiConfig());
-$keywords = $model->detect_keywords($title, $comment);
-json_response(['keywords' => $keywords]);
+    $model = new Model(Config::getMysqlConfig(), Config::getOpenAiConfig());
+    $keywords = $model->detect_keywords($title, $comment);
+    json_response(['keywords' => $keywords]);
+} catch (\Throwable $error) {
+    json_response(['error' => $error->getMessage()], 400);
+}

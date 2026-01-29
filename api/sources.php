@@ -77,63 +77,67 @@ function parse_keywords(mixed $value): array {
     return [];
 }
 
-$model = new Model(Config::getMysqlConfig(), Config::getOpenAiConfig());
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+try {
+    $model = new Model(Config::getMysqlConfig(), Config::getOpenAiConfig());
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-if ($method === 'GET') {
-    $url = $_GET['url'] ?? null;
-    if (\is_string($url) && \trim($url) !== '') {
-        $keywords = parse_keywords($_GET['keywords'] ?? []);
+    if ($method === 'GET') {
+        $url = $_GET['url'] ?? null;
+        if (\is_string($url) && \trim($url) !== '') {
+            $keywords = parse_keywords($_GET['keywords'] ?? []);
+            $state = parse_state($_GET['state'] ?? null);
+            $matches = $model->check_sources($url, $keywords, $state);
+            json_response($matches);
+        }
+
+        $author_id = $_GET['author_id'] ?? null;
+        if (\is_string($author_id) && \is_numeric($author_id)) {
+            $author_id = (int)$author_id;
+        }
+        if (!\is_int($author_id) || $author_id <= 0) {
+            json_response(['error' => 'Missing or invalid author_id.'], 400);
+        }
         $state = parse_state($_GET['state'] ?? null);
-        $matches = $model->check_sources($url, $keywords, $state);
-        json_response($matches);
+        $sources = $model->get_sources($author_id, $state);
+        json_response(['sources' => $sources]);
     }
 
-    $author_id = $_GET['author_id'] ?? null;
-    if (\is_string($author_id) && \is_numeric($author_id)) {
-        $author_id = (int)$author_id;
+    if ($method === 'POST') {
+        $data = read_json_body();
+        $author_id = $data['author_id'] ?? null;
+        $url = $data['url'] ?? null;
+        $title = $data['title'] ?? '';
+        $comment = $data['comment'] ?? '';
+        $keywords = $data['keywords'] ?? [];
+        if (!\is_int($author_id)) {
+            json_response(['error' => 'Missing or invalid author_id.'], 400);
+        }
+        if (!\is_string($url) || \trim($url) === '') {
+            json_response(['error' => 'Missing or invalid url.'], 400);
+        }
+        if (!\is_string($title) || !\is_string($comment)) {
+            json_response(['error' => 'Invalid title or comment.'], 400);
+        }
+        if (!\is_array($keywords)) {
+            json_response(['error' => 'Invalid keywords.'], 400);
+        }
+        $source_id = $model->add_source($author_id, $url, $title, $comment, $keywords);
+        json_response(['id' => $source_id], 201);
     }
-    if (!\is_int($author_id) || $author_id <= 0) {
-        json_response(['error' => 'Missing or invalid author_id.'], 400);
+
+    if ($method === 'PATCH' || $method === 'PUT') {
+        $data = read_json_body();
+        $source_id = $data['source_id'] ?? null;
+        $state = $data['state'] ?? null;
+        if (!\is_int($source_id)) {
+            json_response(['error' => 'Missing or invalid source_id.'], 400);
+        }
+        $state_enum = parse_state($state);
+        $model->change_source_state($source_id, $state_enum);
+        json_response(['ok' => true]);
     }
-    $state = parse_state($_GET['state'] ?? null);
-    $sources = $model->get_sources($author_id, $state);
-    json_response(['sources' => $sources]);
+
+    json_response(['error' => 'Method not allowed.'], 405);
+} catch (\Throwable $error) {
+    json_response(['error' => $error->getMessage()], 400);
 }
-
-if ($method === 'POST') {
-    $data = read_json_body();
-    $author_id = $data['author_id'] ?? null;
-    $url = $data['url'] ?? null;
-    $title = $data['title'] ?? '';
-    $comment = $data['comment'] ?? '';
-    $keywords = $data['keywords'] ?? [];
-    if (!\is_int($author_id)) {
-        json_response(['error' => 'Missing or invalid author_id.'], 400);
-    }
-    if (!\is_string($url) || \trim($url) === '') {
-        json_response(['error' => 'Missing or invalid url.'], 400);
-    }
-    if (!\is_string($title) || !\is_string($comment)) {
-        json_response(['error' => 'Invalid title or comment.'], 400);
-    }
-    if (!\is_array($keywords)) {
-        json_response(['error' => 'Invalid keywords.'], 400);
-    }
-    $source_id = $model->add_source($author_id, $url, $title, $comment, $keywords);
-    json_response(['id' => $source_id], 201);
-}
-
-if ($method === 'PATCH' || $method === 'PUT') {
-    $data = read_json_body();
-    $source_id = $data['source_id'] ?? null;
-    $state = $data['state'] ?? null;
-    if (!\is_int($source_id)) {
-        json_response(['error' => 'Missing or invalid source_id.'], 400);
-    }
-    $state_enum = parse_state($state);
-    $model->change_source_state($source_id, $state_enum);
-    json_response(['ok' => true]);
-}
-
-json_response(['error' => 'Method not allowed.'], 405);
