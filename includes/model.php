@@ -78,7 +78,7 @@ class Model {
         ];
 
         $state_value = $state->value;
-        $stmt = $this->conn->prepare('select s.title, s.url, s.comment, s.author_id, u.name as author_name from sources s join users u on u.id = s.author_id where s.url = ? and s.state = ? limit 1');
+        $stmt = $this->conn->prepare('select s.title, s.url, s.comment, s.author_id, u.name as author_name from sources s join users u on u.id = s.author_id where s.url = ? and s.state = ? order by s.id desc limit 1');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare URL query: ' . $this->conn->error);
         }
@@ -106,7 +106,8 @@ class Model {
             from sources s
             join users u on u.id = s.author_id
             join sources_keywords sk on sk.source_id = s.id
-            where sk.keyword in ($placeholders) and s.state = ?";
+            where sk.keyword in ($placeholders) and s.state = ?
+            order by s.id desc";
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare keyword query: ' . $this->conn->error);
@@ -310,6 +311,49 @@ class Model {
         }
 
         return $source_id;
+    }
+
+    /**
+     * Returns:
+     * [{"id": ..., "url": "...", "title": "...", "comment": "...", "state": ..., "author_id": ..., "author_name": "..."}, ...]
+     */
+    public function get_sources(int $author_id, SourceState $state): array {
+        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name from sources s join users u on u.id = s.author_id where s.author_id = ? and s.state = ? order by s.id desc');
+        if (!$stmt) {
+            throw new \RuntimeException('Failed to prepare fetch sources: ' . $this->conn->error);
+        }
+        $state_value = $state->value;
+        $stmt->bind_param('ii', $author_id, $state_value);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $sources = [];
+        if ($result instanceof \mysqli_result) {
+            $sources = $result->fetch_all(MYSQLI_ASSOC);
+            $result->free();
+        }
+        $stmt->close();
+        return $sources;
+    }
+
+    /**
+     * Returns:
+     * ["keyword1", "keyword2", ...]
+     */
+    public function get_unique_keywords(): array {
+        $result = $this->conn->query('select distinct keyword from sources_keywords order by keyword');
+        if (!$result) {
+            throw new \RuntimeException('Failed to fetch keywords: ' . $this->conn->error);
+        }
+        $keywords = [];
+        if ($result instanceof \mysqli_result) {
+            while ($row = $result->fetch_assoc()) {
+                if (isset($row['keyword'])) {
+                    $keywords[] = $row['keyword'];
+                }
+            }
+            $result->free();
+        }
+        return $keywords;
     }
 
     public function change_source_state(int $source_id, SourceState $state): void {
