@@ -553,13 +553,14 @@ function renderApp() {
 
 async function init() {
   const cached = localStorage.getItem(storageKey);
-  if (cached && !Number.isNaN(Number(cached))) {
+  const hasCached = cached !== null;
+  if (hasCached && cached !== '' && !Number.isNaN(Number(cached))) {
     appState.selectedAuthorId = Number(cached);
   }
   try {
     const result = await api.getUsers();
     appState.users = result.users || [];
-    if (!appState.selectedAuthorId && appState.users.length > 0) {
+    if (!hasCached && !appState.selectedAuthorId && appState.users.length > 0) {
       appState.selectedAuthorId = appState.users[0].id;
     }
   } catch (error) {
