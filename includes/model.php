@@ -33,7 +33,6 @@ create table if not exists `sources_keywords` (
     constraint `sources_keywords_source_id_fk` foreign key (`source_id`) references `sources` (`id`)
 );
 
-create unique index if not exists `sources_url_unique` on `sources` (`url`);
 create index if not exists `sources_title_index` on `sources` (`title`);
 create index if not exists `sources_keywords_source_id_index` on `sources_keywords` (`source_id`);
 create index if not exists `sources_keywords_keyword_index` on `sources_keywords` (`keyword`);
