@@ -318,7 +318,7 @@ class Model {
      * [{"id": ..., "url": "...", "title": "...", "comment": "...", "state": ..., "author_id": ..., "author_name": "..."}, ...]
      */
     public function get_sources(int $author_id, SourceState $state): array {
-        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name from sources s join users u on u.id = s.author_id where s.author_id = ? and s.state = ? order by s.id desc');
+        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.author_id = ? and s.state = ? group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name order by s.id desc');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare fetch sources: ' . $this->conn->error);
         }

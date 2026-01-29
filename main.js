@@ -29,7 +29,7 @@ const api = {
     const params = new URLSearchParams();
     params.set('url', url);
     params.set('state', 'working');
-    keywords.forEach((keyword) => params.append('keywords', keyword));
+    keywords.forEach((keyword) => params.append('keywords[]', keyword));
     return this.request(`/api/sources.php?${params.toString()}`);
   },
   createSource(payload) {
@@ -496,6 +496,19 @@ function renderSourcesPage(container) {
         meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
         if (source.comment) {
           meta.appendChild(createElement('div', { className: 'source-comment', text: source.comment }));
+        }
+        if (source.keywords) {
+          const keywords = String(source.keywords)
+            .split(',')
+            .map((keyword) => keyword.trim())
+            .filter((keyword) => keyword !== '');
+          if (keywords.length > 0) {
+            const chips = createElement('div', { className: 'keyword-list' });
+            keywords.forEach((keyword) => {
+              chips.appendChild(createElement('span', { className: 'chip', text: keyword }));
+            });
+            meta.appendChild(chips);
+          }
         }
         item.appendChild(meta);
         const actions = createElement('div', { className: 'actions' });
