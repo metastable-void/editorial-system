@@ -102,7 +102,7 @@ class Model {
         }
 
         $placeholders = implode(',', array_fill(0, count($keywords), '?'));
-        $sql = "select distinct s.title, s.url, s.comment, s.author_id, u.name as author_name
+        $sql = "select distinct s.title, s.url, s.comment, s.author_id, u.name as author_name, sk.keyword as keyword
             from sources s
             join users u on u.id = s.author_id
             join sources_keywords sk on sk.source_id = s.id

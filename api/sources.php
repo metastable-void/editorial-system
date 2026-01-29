@@ -82,13 +82,23 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($method === 'GET') {
     $url = $_GET['url'] ?? null;
-    if (!\is_string($url) || \trim($url) === '') {
-        json_response(['error' => 'Missing or invalid url.'], 400);
+    if (\is_string($url) && \trim($url) !== '') {
+        $keywords = parse_keywords($_GET['keywords'] ?? []);
+        $state = parse_state($_GET['state'] ?? null);
+        $matches = $model->check_sources($url, $keywords, $state);
+        json_response($matches);
     }
-    $keywords = parse_keywords($_GET['keywords'] ?? []);
+
+    $author_id = $_GET['author_id'] ?? null;
+    if (\is_string($author_id) && \is_numeric($author_id)) {
+        $author_id = (int)$author_id;
+    }
+    if (!\is_int($author_id) || $author_id <= 0) {
+        json_response(['error' => 'Missing or invalid author_id.'], 400);
+    }
     $state = parse_state($_GET['state'] ?? null);
-    $matches = $model->check_sources($url, $keywords, $state);
-    json_response($matches);
+    $sources = $model->get_sources($author_id, $state);
+    json_response(['sources' => $sources]);
 }
 
 if ($method === 'POST') {
