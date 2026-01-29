@@ -267,7 +267,8 @@ function renderNewSourcePage(container) {
       urlMatches.forEach((match) => {
         const item = createElement('div', { className: 'match-item' });
         item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
-        item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'} / ${match.url || ''}` }));
+        const keywordLabel = match.keywords ? ` / ${match.keywords}` : '';
+        item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'} / ${match.url || ''}${keywordLabel}` }));
         if (match.comment) {
           item.appendChild(createElement('div', { className: 'match-comment', text: match.comment }));
         }
@@ -279,10 +280,20 @@ function renderNewSourcePage(container) {
     if (keywordMatches.length > 0) {
       const box = createElement('div', { className: 'match-box warning' });
       box.appendChild(createElement('h3', { text: 'キーワード一致 (警告)' }));
+      const grouped = new Map();
       keywordMatches.forEach((match) => {
+        const key = `${match.url || ''}||${match.title || ''}||${match.author_id || ''}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, { ...match, keywords: [] });
+        }
+        if (match.keyword) {
+          grouped.get(key).keywords.push(match.keyword);
+        }
+      });
+      grouped.forEach((match) => {
         const item = createElement('div', { className: 'match-item' });
         item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
-        const keywordLabel = match.keyword ? ` / ${match.keyword}` : '';
+        const keywordLabel = match.keywords.length > 0 ? ` / ${[...new Set(match.keywords)].join(', ')}` : '';
         item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'}${keywordLabel}` }));
         box.appendChild(item);
       });
