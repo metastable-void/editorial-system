@@ -1,0 +1,4 @@
+# Deny access to .git directories
+<DirectoryMatch "(^|/)\.git/">
+    Require all denied
+</DirectoryMatch>
