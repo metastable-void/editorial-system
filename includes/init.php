@@ -12,6 +12,19 @@ function return_error_response(string $error): never {
     exit;
 }
 
+if (!\headers_sent()) {
+    \header('Access-Control-Allow-Origin: *');
+    \header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, OPTIONS');
+    \header('Access-Control-Allow-Headers: Content-Type, Authorization');
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    if (!\headers_sent()) {
+        \header('HTTP/1.1 204 No Content');
+    }
+    exit;
+}
+
 if (!\is_file(__DIR__ . '/config.php')) {
     return_error_response('No config.php found');
 }
