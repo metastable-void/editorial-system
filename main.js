@@ -282,7 +282,7 @@ function renderNewSourcePage(container) {
       box.appendChild(createElement('h3', { text: 'キーワード一致 (警告)' }));
       const grouped = new Map();
       keywordMatches.forEach((match) => {
-        const key = `${match.url || ''}||${match.title || ''}||${match.author_id || ''}`;
+        const key = match.id ? String(match.id) : `${match.url || ''}||${match.title || ''}||${match.author_id || ''}`;
         if (!grouped.has(key)) {
           grouped.set(key, { ...match, keywords: [] });
         }
