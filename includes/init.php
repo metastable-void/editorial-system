@@ -12,13 +12,20 @@ function return_error_response(string $error): never {
     exit;
 }
 
+$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+$is_api_request = \is_string($request_uri) && \strpos($request_uri, '/api/') === 0;
+
 if (!\headers_sent()) {
-    \header('Access-Control-Allow-Origin: *');
-    \header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, OPTIONS');
-    \header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    if ($is_api_request) {
+        \header('Access-Control-Allow-Origin: *');
+        \header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, OPTIONS');
+        \header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    } else {
+        \header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+    }
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+if ($is_api_request && (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS')) {
     if (!\headers_sent()) {
         \header('HTTP/1.1 204 No Content');
     }
