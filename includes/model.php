@@ -40,6 +40,12 @@ create index if not exists `sources_keywords_keyword_index` on `sources_keywords
 
 SQL;
 
+enum SourceState: int {
+    case Aborted = -1;
+    case Working = 0;
+    case Done = 1;
+}
+
 class Model {
     private \mysqli $conn;
     private OpenAiConfig $openai;
@@ -65,17 +71,18 @@ class Model {
      *  "keyword_matches": [{"title": "...", "url": "...", "comment": "..."}, ...],
      * }
      */
-    public function check_sources(string $url, array $keywords, int $state): array {
+    public function check_sources(string $url, array $keywords, SourceState $state): array {
         $matches = [
             'url_matches' => [],
             'keyword_matches' => [],
         ];
 
-        $stmt = $this->conn->prepare('select s.title, s.url, s.comment, s.author_id, u.name as author_name from sources s join users u on u.id = s.author_id where s.url = ? limit 1');
+        $state_value = $state->value;
+        $stmt = $this->conn->prepare('select s.title, s.url, s.comment, s.author_id, u.name as author_name from sources s join users u on u.id = s.author_id where s.url = ? and s.state = ? limit 1');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare URL query: ' . $this->conn->error);
         }
-        $stmt->bind_param('s', $url);
+        $stmt->bind_param('si', $url, $state_value);
         $stmt->execute();
         $result = $stmt->get_result();
         if ($result instanceof \mysqli_result) {
@@ -99,16 +106,17 @@ class Model {
             from sources s
             join users u on u.id = s.author_id
             join sources_keywords sk on sk.source_id = s.id
-            where sk.keyword in ($placeholders)";
+            where sk.keyword in ($placeholders) and s.state = ?";
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare keyword query: ' . $this->conn->error);
         }
-        $types = str_repeat('s', count($keywords));
+        $types = str_repeat('s', count($keywords)) . 'i';
         $bind_params = [$types];
         foreach ($keywords as $index => $keyword) {
             $bind_params[] = &$keywords[$index];
         }
+        $bind_params[] = &$state_value;
         $stmt->bind_param(...$bind_params);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -304,12 +312,13 @@ class Model {
         return $source_id;
     }
 
-    public function change_source_state(int $source_id, int $state): void {
+    public function change_source_state(int $source_id, SourceState $state): void {
         $stmt = $this->conn->prepare('update sources set state = ? where id = ?');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare update source state: ' . $this->conn->error);
         }
-        $stmt->bind_param('ii', $state, $source_id);
+        $state_value = $state->value;
+        $stmt->bind_param('ii', $state_value, $source_id);
         if (!$stmt->execute()) {
             $stmt->close();
             throw new \RuntimeException('Failed to update source state: ' . $this->conn->error);
