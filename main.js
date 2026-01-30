@@ -205,6 +205,8 @@ function renderUsersPage(container) {
   const section = createElement('section', { className: 'panel' });
   section.appendChild(createElement('h2', { text: 'ユーザー管理' }));
 
+  const intro = createElement('div', { className: 'hint', text: '最初にユーザーを作成してください。作成後は上部の担当者選択から利用できます。' });
+
   const list = createElement('div', { className: 'list' });
   appState.users.forEach((user) => {
     const item = createElement('div', { className: 'list-item' });
@@ -245,9 +247,10 @@ function renderUsersPage(container) {
   form.appendChild(input);
   form.appendChild(button);
 
-  section.appendChild(list);
   section.appendChild(form);
   section.appendChild(status);
+  section.appendChild(intro);
+  section.appendChild(list);
   container.appendChild(section);
 }
 
@@ -835,13 +838,14 @@ async function init() {
   try {
     const result = await api.getUsers();
     appState.users = normalizeUsers(result.users);
-    if (!hasCached && !appState.selectedAuthorId && appState.users.length > 0) {
-      appState.selectedAuthorId = appState.users[0].id;
-    }
   } catch (error) {
     appState.users = [];
   }
   renderApp();
+
+  if (!hasCached && !appState.selectedAuthorId) {
+    location.hash = '#/users';
+  }
 }
 
 window.addEventListener('hashchange', renderApp);
