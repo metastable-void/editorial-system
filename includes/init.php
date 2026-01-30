@@ -12,12 +12,29 @@ function send_header(string $header): void {
     }
 }
 
-function return_error_response(string $error): never {
+function json_response(array $data, int $status = 200): never {
     send_header('Content-Type: application/json');
-    $data = [];
-    $data['error'] = $error;
+    if (!\headers_sent() && !is_cli_request()) {
+        \http_response_code($status);
+    }
     echo \json_encode($data);
     exit;
+}
+
+function read_json_body(): array {
+    $raw = \file_get_contents('php://input');
+    if (!\is_string($raw) || \trim($raw) === '') {
+        return [];
+    }
+    $decoded = \json_decode($raw, true);
+    if (!\is_array($decoded)) {
+        json_response(['error' => 'Invalid JSON body.'], 400);
+    }
+    return $decoded;
+}
+
+function return_error_response(string $error): never {
+    json_response(['error' => $error], 400);
 }
 
 $request_uri = $_SERVER['REQUEST_URI'] ?? '';

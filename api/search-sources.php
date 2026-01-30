@@ -4,15 +4,6 @@ namespace innovatopia_jp\editorial;
 
 require_once __DIR__ . '/../includes/init.php';
 
-function json_response(array $data, int $status = 200): never {
-    if (!\headers_sent()) {
-        \header('Content-Type: application/json');
-        \http_response_code($status);
-    }
-    echo \json_encode($data);
-    exit;
-}
-
 function parse_state(mixed $value): SourceState {
     if (\is_string($value)) {
         $trimmed = \trim($value);
