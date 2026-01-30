@@ -467,6 +467,50 @@ class Model {
         return $keywords;
     }
 
+    /**
+     * Returns:
+     * ["working" => ..., "done" => ..., "aborted" => ...]
+     */
+    public function get_keyword_state_counts(string $keyword): array {
+        $keyword = trim($keyword);
+        if ($keyword === '') {
+            return ['working' => 0, 'done' => 0, 'aborted' => 0];
+        }
+        $sql = 'select s.state, count(distinct s.id) as count
+            from sources s
+            join sources_keywords sk on sk.source_id = s.id
+            where sk.keyword = ?
+            group by s.state';
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            throw new \RuntimeException('Failed to prepare keyword state counts: ' . $this->conn->error);
+        }
+        $stmt->bind_param('s', $keyword);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $counts = [
+            'working' => 0,
+            'done' => 0,
+            'aborted' => 0,
+        ];
+        if ($result instanceof \mysqli_result) {
+            while ($row = $result->fetch_assoc()) {
+                $state = (int)($row['state'] ?? 0);
+                $count = (int)($row['count'] ?? 0);
+                if ($state === SourceState::Working->value) {
+                    $counts['working'] = $count;
+                } elseif ($state === SourceState::Done->value) {
+                    $counts['done'] = $count;
+                } elseif ($state === SourceState::Aborted->value) {
+                    $counts['aborted'] = $count;
+                }
+            }
+            $result->free();
+        }
+        $stmt->close();
+        return $counts;
+    }
+
     public function change_source_state(int $source_id, SourceState $state): void {
         $stmt = $this->conn->prepare('update sources set state = ? where id = ?');
         if (!$stmt) {
