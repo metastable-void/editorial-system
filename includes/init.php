@@ -2,33 +2,39 @@
 
 namespace innovatopia_jp\editorial;
 
-function return_error_response(string $error): never {
-    if (!\headers_sent()) {
-        \header('Content-Type: application/json');
-        $data = [];
-        $data['error'] = $error;
-        echo \json_encode($data);
+function is_cli_request(): bool {
+    return \PHP_SAPI === 'cli' || \PHP_SAPI === 'phpdbg';
+}
+
+function send_header(string $header): void {
+    if (!\headers_sent() && !is_cli_request()) {
+        \header($header);
     }
+}
+
+function return_error_response(string $error): never {
+    send_header('Content-Type: application/json');
+    $data = [];
+    $data['error'] = $error;
+    echo \json_encode($data);
     exit;
 }
 
 $request_uri = $_SERVER['REQUEST_URI'] ?? '';
 $is_api_request = \is_string($request_uri) && \strpos($request_uri, '/api/') === 0;
 
-if (!\headers_sent()) {
+if (!is_cli_request()) {
     if ($is_api_request) {
-        \header('Access-Control-Allow-Origin: *');
-        \header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, OPTIONS');
-        \header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        send_header('Access-Control-Allow-Origin: *');
+        send_header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, OPTIONS');
+        send_header('Access-Control-Allow-Headers: Content-Type, Authorization');
     } else {
-        \header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+        send_header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
     }
 }
 
 if ($is_api_request && (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS')) {
-    if (!\headers_sent()) {
-        \header('HTTP/1.1 204 No Content');
-    }
+    send_header('HTTP/1.1 204 No Content');
     exit;
 }
 
@@ -53,10 +59,11 @@ if ($auth_user === null || $auth_pass === null) {
     }
 }
 if ($auth_user !== $login->username || $auth_pass !== $login->password) {
-    if (!\headers_sent()) {
-        \header('WWW-Authenticate: Basic realm="Editorial"');
-        \header('HTTP/1.1 401 Unauthorized');
+    if (is_cli_request()) {
+        return_error_response('Unauthorized');
     }
+    send_header('WWW-Authenticate: Basic realm="Editorial"');
+    send_header('HTTP/1.1 401 Unauthorized');
     return_error_response('Unauthorized');
 }
 
