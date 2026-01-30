@@ -19,6 +19,7 @@ create table if not exists `sources` (
     author_id integer not null,
     comment blob not null default '',
     state integer not null default 0, -- 0: working, 1: done, -1: aborted/deleted
+    updated_date bigint not null default 1769748117,
     constraint `sources_users_id_fk` foreign key  (`author_id`) references `users` (`id`)
 );
 
@@ -79,7 +80,7 @@ class Model {
         ];
 
         $state_value = $state->value;
-        $stmt = $this->conn->prepare('select s.title, s.url, s.comment, s.author_id, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.url = ? and s.state = ? group by s.id, s.title, s.url, s.comment, s.author_id, u.name order by s.id desc limit 1');
+        $stmt = $this->conn->prepare('select s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.url = ? and s.state = ? group by s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name order by s.id desc limit 1');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare URL query: ' . $this->conn->error);
         }
@@ -103,12 +104,12 @@ class Model {
         }
 
         $placeholders = implode(',', array_fill(0, count($keywords), '?'));
-        $sql = "select s.id, s.title, s.url, s.comment, s.author_id, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator ',') as keywords
+        $sql = "select s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator ',') as keywords
             from sources s
             join users u on u.id = s.author_id
             join sources_keywords sk on sk.source_id = s.id
             where sk.keyword in ($placeholders) and s.state = ?
-            group by s.id, s.title, s.url, s.comment, s.author_id, u.name
+            group by s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name
             order by s.id desc";
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
@@ -287,11 +288,12 @@ class Model {
         }
         $this->conn->begin_transaction();
         try {
-            $stmt = $this->conn->prepare('insert into sources (url, title, author_id, comment, state) values (?, ?, ?, ?, 0)');
+            $stmt = $this->conn->prepare('insert into sources (url, title, author_id, comment, state, updated_date) values (?, ?, ?, ?, 0, ?)');
             if (!$stmt) {
                 throw new \RuntimeException('Failed to prepare insert source: ' . $this->conn->error);
             }
-            $stmt->bind_param('ssis', $url, $title, $author_id, $comment);
+            $now = time();
+            $stmt->bind_param('ssisi', $url, $title, $author_id, $comment, $now);
             if (!$stmt->execute()) {
                 $stmt->close();
                 throw new \RuntimeException('Failed to insert source: ' . $this->conn->error);
@@ -351,7 +353,7 @@ class Model {
      * [{"id": ..., "url": "...", "title": "...", "comment": "...", "state": ..., "author_id": ..., "author_name": "..."}, ...]
      */
     public function get_sources(int $author_id, SourceState $state): array {
-        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.author_id = ? and s.state = ? group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name order by s.id desc limit 1000');
+        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.author_id = ? and s.state = ? group by s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name order by s.id desc limit 1000');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare fetch sources: ' . $this->conn->error);
         }
@@ -381,7 +383,7 @@ class Model {
         }
 
         $placeholders = implode(',', array_fill(0, count($keywords), '?'));
-        $sql = "select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name,
+        $sql = "select s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name as author_name,
                 group_concat(distinct sk_all.keyword order by sk_all.keyword separator ',') as keywords,
                 group_concat(distinct sk_match.keyword order by sk_match.keyword separator ',') as matched_keywords,
                 count(distinct sk_match.keyword) as match_count
@@ -390,7 +392,7 @@ class Model {
             join sources_keywords sk_match on sk_match.source_id = s.id
             left join sources_keywords sk_all on sk_all.source_id = s.id
             where sk_match.keyword in ($placeholders) and s.state = ?
-            group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name
+            group by s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name
             order by match_count desc, s.id desc
             limit 1000";
         $stmt = $this->conn->prepare($sql);
@@ -607,12 +609,13 @@ class Model {
     }
 
     public function change_source_state(int $source_id, SourceState $state): void {
-        $stmt = $this->conn->prepare('update sources set state = ? where id = ?');
+        $stmt = $this->conn->prepare('update sources set state = ?, updated_date = ? where id = ?');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare update source state: ' . $this->conn->error);
         }
         $state_value = $state->value;
-        $stmt->bind_param('ii', $state_value, $source_id);
+        $now = time();
+        $stmt->bind_param('iii', $state_value, $now, $source_id);
         if (!$stmt->execute()) {
             $stmt->close();
             throw new \RuntimeException('Failed to update source state: ' . $this->conn->error);
