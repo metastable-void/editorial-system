@@ -217,12 +217,16 @@ class Model {
                     'title_ja' => [
                         'type' => 'string',
                     ],
-                    'keywords' => [
+                    'keywords_en' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                    ],
+                    'keywords_ja' => [
                         'type' => 'array',
                         'items' => ['type' => 'string'],
                     ],
                 ],
-                'required' => ['keywords', 'title_ja'],
+                'required' => ['keywords_en', 'keywords_ja', 'title_ja'],
                 'additionalProperties' => false,
             ],
         ];
@@ -237,7 +241,7 @@ class Model {
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. For proper nouns, whenever feasible, include both Japanese and English variants. Include both English and Japanese forms where applicable. Also produce a concise Japanese title summary (title_ja). Return only the JSON object matching the schema.',
+                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Return separate lists: keywords_en (English) and keywords_ja (Japanese). Prefer the most common normalized forms. For proper nouns, whenever feasible, include both Japanese and English variants in their respective lists. When a term must appear in both lists (e.g., AI), include it in both, but prefer katakana in keywords_ja when feasible. Also produce a concise Japanese title summary (title_ja). Return only the JSON object matching the schema.',
                 ],
                 [
                     'role' => 'user',
@@ -255,7 +259,8 @@ class Model {
             throw new \RuntimeException('Failed to decode OpenAI response content.');
         }
 
-        $keywords = $decoded['keywords'] ?? [];
+        $keywords_en = $decoded['keywords_en'] ?? [];
+        $keywords_ja = $decoded['keywords_ja'] ?? [];
         $title_ja = $decoded['title_ja'] ?? '';
         if (!is_string($title_ja)) {
             $title_ja = '';
@@ -263,7 +268,10 @@ class Model {
         $title_ja = trim($title_ja);
 
         return [
-            'keywords' => $this->normalize_keywords($keywords),
+            'keywords' => $this->normalize_keywords(array_merge(
+                is_array($keywords_en) ? $keywords_en : [],
+                is_array($keywords_ja) ? $keywords_ja : []
+            )),
             'title_ja' => $title_ja,
         ];
     }
