@@ -17,7 +17,7 @@ function json_response(array $data, int $status = 200): never {
     if (!\headers_sent() && !is_cli_request()) {
         \http_response_code($status);
     }
-    echo \json_encode($data), '\n';
+    echo \json_encode($data), "\n";
     exit;
 }
 
