@@ -143,6 +143,38 @@ function renderKeywordChips(keywords) {
   return wrapper;
 }
 
+function formatTimestamp(seconds) {
+  if (seconds === null || seconds === undefined || seconds === '') {
+    return '';
+  }
+  const value = Number(seconds);
+  if (Number.isNaN(value) || value <= 0) {
+    return '';
+  }
+  const date = new Date(value * 1000);
+  const pad = (num) => String(num).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const secondsPart = pad(date.getSeconds());
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absMinutes = Math.abs(offsetMinutes);
+  const offsetHours = pad(Math.floor(absMinutes / 60));
+  const offsetMins = pad(absMinutes % 60);
+  return `${year}-${month}-${day} ${hours}:${minutes}:${secondsPart} (${sign}${offsetHours}${offsetMins})`;
+}
+
+function renderTimestamp(value) {
+  const formatted = formatTimestamp(value);
+  if (!formatted) {
+    return null;
+  }
+  return createElement('div', { className: 'muted', text: `更新: ${formatted}` });
+}
+
 function renderTopbar(container) {
   const topbar = createElement('div', { className: 'topbar' });
   const title = createElement('div', { className: 'brand', text: '編集部システム' });
@@ -354,6 +386,10 @@ function renderNewSourcePage(container) {
         const item = createElement('div', { className: 'match-item' });
         item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
         item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'} / ${match.url || ''}` }));
+        const timestamp = renderTimestamp(match.updated_date);
+        if (timestamp) {
+          item.appendChild(timestamp);
+        }
         if (match.keywords) {
           const keywords = String(match.keywords)
             .split(',')
@@ -396,6 +432,10 @@ function renderNewSourcePage(container) {
         const item = createElement('div', { className: 'match-item' });
         item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
         item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'}` }));
+        const timestamp = renderTimestamp(match.updated_date);
+        if (timestamp) {
+          item.appendChild(timestamp);
+        }
         const uniqueKeywords = [...new Set(match.keywords)].filter((keyword) => keyword !== '');
         if (uniqueKeywords.length > 0) {
           item.appendChild(renderKeywordChips(uniqueKeywords));
@@ -643,6 +683,10 @@ function renderSourcesPage(container) {
         const meta = createElement('div', { className: 'source-meta' });
         meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
         meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
+        const timestamp = renderTimestamp(source.updated_date);
+        if (timestamp) {
+          meta.appendChild(timestamp);
+        }
         if (source.comment) {
           meta.appendChild(createElement('div', { className: 'source-comment', text: source.comment }));
         }
@@ -753,21 +797,25 @@ function renderKeywordDetailPage(container, keyword) {
 
   async function loadState(state, target) {
     const result = await api.searchSources([keyword], state);
-    const sources = result.sources || [];
-    target.innerHTML = '';
-    if (sources.length === 0) {
-      target.appendChild(createElement('div', { className: 'empty', text: '該当なし' }));
-      return;
-    }
-    sources.forEach((source) => {
-      const item = createElement('div', { className: 'list-item' });
-      const meta = createElement('div', { className: 'source-meta' });
-      meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
-      meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
-      meta.appendChild(createElement('div', { className: 'match-meta', text: source.author_name || '不明' }));
-      if (source.comment) {
-        meta.appendChild(createElement('div', { className: 'source-comment', text: source.comment }));
+      const sources = result.sources || [];
+      target.innerHTML = '';
+      if (sources.length === 0) {
+        target.appendChild(createElement('div', { className: 'empty', text: '該当なし' }));
+        return;
       }
+      sources.forEach((source) => {
+        const item = createElement('div', { className: 'list-item' });
+        const meta = createElement('div', { className: 'source-meta' });
+        meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
+        meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
+        meta.appendChild(createElement('div', { className: 'match-meta', text: source.author_name || '不明' }));
+        const timestamp = renderTimestamp(source.updated_date);
+        if (timestamp) {
+          meta.appendChild(timestamp);
+        }
+        if (source.comment) {
+          meta.appendChild(createElement('div', { className: 'source-comment', text: source.comment }));
+        }
       if (source.keywords) {
         const keywords = String(source.keywords)
           .split(',')
@@ -841,6 +889,10 @@ function renderSearchPage(container, query) {
         meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
         meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
         meta.appendChild(createElement('div', { className: 'match-meta', text: source.author_name || '不明' }));
+        const timestamp = renderTimestamp(source.updated_date);
+        if (timestamp) {
+          meta.appendChild(timestamp);
+        }
         if (source.comment) {
           meta.appendChild(createElement('div', { className: 'source-comment', text: source.comment }));
         }
