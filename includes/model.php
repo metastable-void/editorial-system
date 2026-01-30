@@ -173,6 +173,27 @@ class Model {
     }
 
     /**
+     * Returns:
+     * {"id": ..., "name": "..."}
+     */
+    public function update_user(int $user_id, string $name): array {
+        $stmt = $this->conn->prepare('update users set name = ? where id = ?');
+        if (!$stmt) {
+            throw new \RuntimeException('Failed to prepare update user: ' . $this->conn->error);
+        }
+        $stmt->bind_param('si', $name, $user_id);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to update user: ' . $this->conn->error);
+        }
+        $stmt->close();
+        return [
+            'id' => $user_id,
+            'name' => $name,
+        ];
+    }
+
+    /**
      * Extracts important short (single semantic word) keywords
      * (who is involved, what happened, etc.) from the title and the comment related
      * using OpenAI structured output, preferring most common normalized forms as keywords,
@@ -508,6 +529,42 @@ class Model {
             throw new \RuntimeException('Failed to prepare keyword state counts: ' . $this->conn->error);
         }
         $stmt->bind_param('s', $keyword);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $counts = [
+            'working' => 0,
+            'done' => 0,
+            'aborted' => 0,
+        ];
+        if ($result instanceof \mysqli_result) {
+            while ($row = $result->fetch_assoc()) {
+                $state = (int)($row['state'] ?? 0);
+                $count = (int)($row['count'] ?? 0);
+                if ($state === SourceState::Working->value) {
+                    $counts['working'] = $count;
+                } elseif ($state === SourceState::Done->value) {
+                    $counts['done'] = $count;
+                } elseif ($state === SourceState::Aborted->value) {
+                    $counts['aborted'] = $count;
+                }
+            }
+            $result->free();
+        }
+        $stmt->close();
+        return $counts;
+    }
+
+    /**
+     * Returns:
+     * ["working" => ..., "done" => ..., "aborted" => ...]
+     */
+    public function get_user_state_counts(int $author_id): array {
+        $sql = 'select state, count(*) as count from sources where author_id = ? group by state';
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            throw new \RuntimeException('Failed to prepare user state counts: ' . $this->conn->error);
+        }
+        $stmt->bind_param('i', $author_id);
         $stmt->execute();
         $result = $stmt->get_result();
         $counts = [

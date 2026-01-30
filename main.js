@@ -1,3 +1,5 @@
+const WORKING_SOURCES_LIMIT = 20;
+
 const api = {
   async request(path, options = {}) {
     const response = await fetch(path, options);
@@ -13,6 +15,18 @@ const api = {
   },
   listKeywords() {
     return this.request('/api/keywords.php');
+  },
+  getUserCounts(userId) {
+    const params = new URLSearchParams();
+    params.set('user_id', String(userId));
+    return this.request(`/api/user-counts.php?${params.toString()}`);
+  },
+  updateUser(userId, name) {
+    return this.request('/api/users.php', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, name }),
+    });
   },
   createUser(name) {
     return this.request('/api/users.php', {
@@ -209,7 +223,8 @@ function renderUsersPage(container) {
 
   const list = createElement('div', { className: 'list' });
   appState.users.forEach((user) => {
-    const item = createElement('div', { className: 'list-item' });
+    const item = createElement('a', { className: 'list-item link-item' });
+    item.href = `#/users/${encodeURIComponent(String(user.id))}`;
     item.appendChild(createElement('span', { text: user.name }));
     item.appendChild(createElement('span', { className: 'muted', text: `#${user.id}` }));
     list.appendChild(item);
@@ -503,6 +518,17 @@ function renderNewSourcePage(container) {
     }
     if (!latestMatches) {
       setStatus(status, '重複チェックを実行してください。', 'error');
+      return;
+    }
+    try {
+      const counts = await api.getUserCounts(appState.selectedAuthorId);
+      const workingCount = counts.counts ? counts.counts.working : 0;
+      if (workingCount >= WORKING_SOURCES_LIMIT) {
+        setStatus(status, `作業中の上限（${WORKING_SOURCES_LIMIT}件）に達しています。`, 'error');
+        return;
+      }
+    } catch (error) {
+      setStatus(status, error.message, 'error');
       return;
     }
     const urlRaw = urlInput.value.trim();
@@ -840,6 +866,78 @@ function renderSearchPage(container, query) {
   container.appendChild(section);
 }
 
+function renderUserDetailPage(container, userId) {
+  const section = createElement('section', { className: 'panel' });
+  section.appendChild(createElement('h2', { text: `ユーザー詳細 #${userId}` }));
+  const status = createElement('div', { className: 'status' });
+  const countsRow = createElement('div', { className: 'list' });
+  const form = createElement('form', { className: 'inline-form' });
+  const input = createElement('input');
+  input.type = 'text';
+  input.placeholder = 'ユーザー名';
+  const saveButton = createElement('button', { text: '更新' });
+  saveButton.type = 'submit';
+  form.appendChild(input);
+  form.appendChild(saveButton);
+
+  section.appendChild(status);
+  section.appendChild(form);
+  section.appendChild(countsRow);
+
+  const user = appState.users.find((entry) => String(entry.id) === String(userId));
+  if (user) {
+    input.value = user.name;
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = input.value.trim();
+    if (!name) {
+      setStatus(status, '名前を入力してください。', 'error');
+      return;
+    }
+    setStatus(status, '更新中...', 'info');
+    try {
+      const updated = await api.updateUser(Number(userId), name);
+      appState.users = appState.users.map((entry) => (entry.id === updated.id ? updated : entry));
+      setStatus(status, '更新しました。', 'success');
+      renderApp();
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    }
+  });
+
+  async function loadCounts() {
+    setStatus(status, '読み込み中...', 'info');
+    try {
+      const result = await api.getUserCounts(Number(userId));
+      const counts = result.counts || { working: 0, done: 0, aborted: 0 };
+      countsRow.innerHTML = '';
+      const entries = [
+        { label: '作業中', value: counts.working, className: 'state-working' },
+        { label: '完了', value: counts.done, className: 'state-done' },
+        { label: '中止', value: counts.aborted, className: 'state-aborted' },
+      ];
+      entries.forEach((entry) => {
+        const item = createElement('div', { className: 'list-item' });
+        item.appendChild(createElement('span', { text: entry.label }));
+        const badge = createElement('span', {
+          className: `state-badge ${entry.className}`,
+          text: `${entry.value}件`,
+        });
+        item.appendChild(badge);
+        countsRow.appendChild(item);
+      });
+      setStatus(status, '読み込み完了。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    }
+  }
+
+  loadCounts();
+  container.appendChild(section);
+}
+
 function renderRoute(container) {
   const route = location.hash || '#/new-source';
   if (route === '#/users') {
@@ -851,6 +949,9 @@ function renderRoute(container) {
   } else if (route.startsWith('#/keywords/')) {
     const keyword = decodeURIComponent(route.replace('#/keywords/', ''));
     renderKeywordDetailPage(container, keyword);
+  } else if (route.startsWith('#/users/')) {
+    const userId = decodeURIComponent(route.replace('#/users/', ''));
+    renderUserDetailPage(container, userId);
   } else if (route.startsWith('#/search/')) {
     const query = decodeURIComponent(route.replace('#/search/', ''));
     renderSearchPage(container, query);

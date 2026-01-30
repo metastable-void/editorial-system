@@ -383,6 +383,11 @@ button:disabled {
   background: rgba(44, 110, 76, 0.18);
 }
 
+.state-aborted {
+  color: #6a2020;
+  background: rgba(139, 47, 47, 0.18);
+}
+
 @media (max-width: 760px) {
   .topbar {
     flex-direction: column;
