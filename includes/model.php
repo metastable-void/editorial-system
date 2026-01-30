@@ -137,7 +137,7 @@ class Model {
      * [{"id": ..., "name": "..."}]
      */
     public function get_users(): array {
-        $result = $this->conn->query('select id, name from users');
+        $result = $this->conn->query('select id, name from users order by id desc limit 1000');
         if (!$result) {
             throw new \RuntimeException('Failed to fetch users: ' . $this->conn->error);
         }
@@ -298,7 +298,7 @@ class Model {
      * [{"id": ..., "url": "...", "title": "...", "comment": "...", "state": ..., "author_id": ..., "author_name": "..."}, ...]
      */
     public function get_sources(int $author_id, SourceState $state): array {
-        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.author_id = ? and s.state = ? group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name order by s.id desc');
+        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.author_id = ? and s.state = ? group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name order by s.id desc limit 1000');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare fetch sources: ' . $this->conn->error);
         }
@@ -336,7 +336,8 @@ class Model {
             join sources_keywords sk on sk.source_id = s.id
             where sk.keyword in ($placeholders) and s.state = ?
             group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name
-            order by match_count desc, s.id desc";
+            order by match_count desc, s.id desc
+            limit 1000";
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare search sources: ' . $this->conn->error);
@@ -451,7 +452,7 @@ class Model {
      * [{"keyword": "...", "count": ...}, ...]
      */
     public function get_unique_keywords(): array {
-        $result = $this->conn->query('select sk.keyword, count(distinct sk.source_id) as count from sources_keywords sk join sources s on s.id = sk.source_id where s.state >= 0 group by sk.keyword order by count desc, sk.keyword');
+        $result = $this->conn->query('select sk.keyword, count(distinct sk.source_id) as count from sources_keywords sk join sources s on s.id = sk.source_id where s.state >= 0 group by sk.keyword order by count desc, sk.keyword limit 1000');
         if (!$result) {
             throw new \RuntimeException('Failed to fetch keywords: ' . $this->conn->error);
         }
