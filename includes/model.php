@@ -448,10 +448,10 @@ class Model {
 
     /**
      * Returns:
-     * ["keyword1", "keyword2", ...]
+     * [{"keyword": "...", "count": ...}, ...]
      */
     public function get_unique_keywords(): array {
-        $result = $this->conn->query('select distinct keyword from sources_keywords order by keyword');
+        $result = $this->conn->query('select sk.keyword, count(distinct sk.source_id) as count from sources_keywords sk join sources s on s.id = sk.source_id where s.state >= 0 group by sk.keyword order by count desc, sk.keyword');
         if (!$result) {
             throw new \RuntimeException('Failed to fetch keywords: ' . $this->conn->error);
         }
@@ -459,7 +459,10 @@ class Model {
         if ($result instanceof \mysqli_result) {
             while ($row = $result->fetch_assoc()) {
                 if (isset($row['keyword'])) {
-                    $keywords[] = $row['keyword'];
+                    $keywords[] = [
+                        'keyword' => $row['keyword'],
+                        'count' => (int)($row['count'] ?? 0),
+                    ];
                 }
             }
             $result->free();
