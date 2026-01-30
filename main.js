@@ -251,6 +251,10 @@ function renderUsersPage(container) {
     try {
       const created = await api.createUser(name);
       appState.users = [...appState.users, ...normalizeUsers([created])];
+      if (!appState.selectedAuthorId) {
+        appState.selectedAuthorId = Number(created.id);
+        localStorage.setItem(storageKey, String(created.id));
+      }
       input.value = '';
       setStatus(status, '作成しました。', 'success');
       renderApp();
@@ -325,7 +329,7 @@ function renderNewSourcePage(container) {
 
   function updateButtonStates() {
     checkButton.disabled = !keywordsDetected;
-    submitButton.disabled = !latestMatches;
+    submitButton.disabled = !latestMatches || !appState.selectedAuthorId;
   }
 
   function renderMatches(matches) {
