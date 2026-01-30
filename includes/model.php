@@ -228,27 +228,7 @@ class Model {
         }
 
         $keywords = $decoded['keywords'] ?? [];
-        if (!is_array($keywords)) {
-            $keywords = [];
-        }
-
-        $normalized = [];
-        foreach ($keywords as $keyword) {
-            if (!is_string($keyword)) {
-                continue;
-            }
-            $value = trim($keyword);
-            if ($value === '') {
-                continue;
-            }
-            $value = strtolower($value);
-            $value = preg_replace('/\s+/', '-', $value);
-            if ($value !== '') {
-                $normalized[] = $value;
-            }
-        }
-
-        return array_values(array_unique($normalized));
+        return $this->normalize_keywords($keywords);
     }
 
     /**
@@ -434,10 +414,17 @@ class Model {
         }
 
         $keywords = $decoded['keywords'] ?? [];
+        return $this->normalize_keywords($keywords);
+    }
+
+    /**
+     * @param mixed $keywords
+     * @return string[]
+     */
+    private function normalize_keywords(mixed $keywords): array {
         if (!is_array($keywords)) {
             $keywords = [];
         }
-
         $normalized = [];
         foreach ($keywords as $keyword) {
             if (!is_string($keyword)) {
@@ -448,12 +435,14 @@ class Model {
                 continue;
             }
             $value = strtolower($value);
+            $value = preg_replace('/[[:punct:]\x{3000}]+/u', '-', $value);
             $value = preg_replace('/\s+/', '-', $value);
+            $value = preg_replace('/-+/', '-', $value);
+            $value = trim($value, '-');
             if ($value !== '') {
                 $normalized[] = $value;
             }
         }
-
         return array_values(array_unique($normalized));
     }
 
