@@ -178,10 +178,14 @@ class Model {
      * using OpenAI structured output, preferring most common normalized forms as keywords,
      * requesting to include both English and Japanese forms,
      * and lowercase all alphabets and replace all spaces in the keywords to '-' (this step is done algorithmically).
+     * Also returns a summarized Japanese title.
      */
     public function detect_keywords(string $title, string $comment): array {
         if ($title === '' && $comment === '') {
-            return [];
+            return [
+                'keywords' => [],
+                'title_ja' => '',
+            ];
         }
 
         $schema = [
@@ -189,12 +193,15 @@ class Model {
             'schema' => [
                 'type' => 'object',
                 'properties' => [
+                    'title_ja' => [
+                        'type' => 'string',
+                    ],
                     'keywords' => [
                         'type' => 'array',
                         'items' => ['type' => 'string'],
                     ],
                 ],
-                'required' => ['keywords'],
+                'required' => ['keywords', 'title_ja'],
                 'additionalProperties' => false,
             ],
         ];
@@ -209,7 +216,7 @@ class Model {
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. Include both English and Japanese forms where applicable. Return only the JSON object matching the schema.',
+                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. For proper nouns, whenever feasible, include both Japanese and English variants. Include both English and Japanese forms where applicable. Also produce a concise Japanese title summary (title_ja). Return only the JSON object matching the schema.',
                 ],
                 [
                     'role' => 'user',
@@ -228,7 +235,16 @@ class Model {
         }
 
         $keywords = $decoded['keywords'] ?? [];
-        return $this->normalize_keywords($keywords);
+        $title_ja = $decoded['title_ja'] ?? '';
+        if (!is_string($title_ja)) {
+            $title_ja = '';
+        }
+        $title_ja = trim($title_ja);
+
+        return [
+            'keywords' => $this->normalize_keywords($keywords),
+            'title_ja' => $title_ja,
+        ];
     }
 
     /**
@@ -398,7 +414,7 @@ class Model {
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. Include both English and Japanese forms where applicable. Return only the JSON object matching the schema.',
+                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. For proper nouns, whenever feasible, include both Japanese and English variants. Include both English and Japanese forms where applicable. Return only the JSON object matching the schema.',
                 ],
                 [
                     'role' => 'user',

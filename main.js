@@ -265,6 +265,7 @@ function renderNewSourcePage(container) {
   const titleInput = createElement('input');
   titleInput.type = 'text';
   titleInput.placeholder = 'タイトル';
+  const titlePreview = createElement('div', { className: 'hint' });
   const commentInput = document.createElement('textarea');
   commentInput.placeholder = 'コメント';
 
@@ -282,6 +283,7 @@ function renderNewSourcePage(container) {
   const confirmSection = createElement('div', { className: 'confirm hidden' });
 
   let detectedKeywords = [];
+  let detectedTitleJa = '';
   let latestMatches = null;
   let allowUrlOverride = false;
   let allowKeywordOverride = false;
@@ -295,6 +297,14 @@ function renderNewSourcePage(container) {
       return;
     }
     keywordsView.appendChild(renderKeywordChips(detectedKeywords));
+  }
+
+  function renderTitlePreview() {
+    if (!detectedTitleJa) {
+      titlePreview.textContent = '';
+      return;
+    }
+    titlePreview.textContent = `日本語タイトル案: ${detectedTitleJa}`;
   }
 
   function renderMatches(matches) {
@@ -428,7 +438,12 @@ function renderNewSourcePage(container) {
     try {
       const result = await api.detectKeywords(title, comment);
       detectedKeywords = Array.isArray(result.keywords) ? result.keywords : [];
+      detectedTitleJa = typeof result.title_ja === 'string' ? result.title_ja.trim() : '';
+      if (detectedTitleJa) {
+        titleInput.value = detectedTitleJa;
+      }
       renderKeywords();
+      renderTitlePreview();
       resetMatches();
       setStatus(status, '検出完了。', 'success');
     } catch (error) {
@@ -512,8 +527,10 @@ function renderNewSourcePage(container) {
       titleInput.value = '';
       commentInput.value = '';
       detectedKeywords = [];
+      detectedTitleJa = '';
       latestMatches = null;
       renderKeywords();
+      renderTitlePreview();
       matchSection.innerHTML = '';
       confirmSection.classList.add('hidden');
       setStatus(status, '登録しました。', 'success');
@@ -527,6 +544,7 @@ function renderNewSourcePage(container) {
   form.appendChild(authorNote);
   form.appendChild(urlInput);
   form.appendChild(titleInput);
+  form.appendChild(titlePreview);
   form.appendChild(commentInput);
 
   const actions = createElement('div', { className: 'actions' });
@@ -541,6 +559,7 @@ function renderNewSourcePage(container) {
   form.appendChild(status);
 
   renderKeywords();
+  renderTitlePreview();
   section.appendChild(form);
   container.appendChild(section);
 }

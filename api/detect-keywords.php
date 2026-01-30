@@ -38,8 +38,10 @@ try {
     }
 
     $model = new Model(Config::getMysqlConfig(), Config::getOpenAiConfig());
-    $keywords = $model->detect_keywords($title, $comment);
-    json_response(['keywords' => $keywords]);
+    $result = $model->detect_keywords($title, $comment);
+    $keywords = $result['keywords'] ?? [];
+    $title_ja = $result['title_ja'] ?? '';
+    json_response(['keywords' => $keywords, 'title_ja' => $title_ja]);
 } catch (\Throwable $error) {
     json_response(['error' => $error->getMessage()], 400);
 }
