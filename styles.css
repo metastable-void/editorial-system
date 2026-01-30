@@ -208,6 +208,13 @@ button:hover {
   box-shadow: 0 12px 20px rgba(15, 90, 83, 0.2);
 }
 
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
