@@ -337,6 +337,128 @@ class Model {
 
     /**
      * Returns:
+     * [{"id": ..., "url": "...", "title": "...", "comment": "...", "state": ..., "author_id": ..., "author_name": "...", "matched_keywords": "...", "match_count": ...}, ...]
+     */
+    public function search_sources(array $keywords, SourceState $state): array {
+        $keywords = array_values(array_unique(array_filter($keywords, static function ($keyword) {
+            return $keyword !== null && $keyword !== '';
+        })));
+        if (!$keywords) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($keywords), '?'));
+        $sql = "select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name,
+                group_concat(distinct sk.keyword order by sk.keyword separator ',') as matched_keywords,
+                count(distinct sk.keyword) as match_count
+            from sources s
+            join users u on u.id = s.author_id
+            join sources_keywords sk on sk.source_id = s.id
+            where sk.keyword in ($placeholders) and s.state = ?
+            group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name
+            order by match_count desc, s.id desc";
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            throw new \RuntimeException('Failed to prepare search sources: ' . $this->conn->error);
+        }
+        $types = str_repeat('s', count($keywords)) . 'i';
+        $bind_params = [$types];
+        foreach ($keywords as $index => $keyword) {
+            $bind_params[] = &$keywords[$index];
+        }
+        $state_value = $state->value;
+        $bind_params[] = &$state_value;
+        $stmt->bind_param(...$bind_params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $sources = [];
+        if ($result instanceof \mysqli_result) {
+            $sources = $result->fetch_all(MYSQLI_ASSOC);
+            $result->free();
+        }
+        $stmt->close();
+        return $sources;
+    }
+
+    /**
+     * Returns:
+     * ["keyword1", "keyword2", ...]
+     */
+    public function search_keywords(string $query): array {
+        $query = trim($query);
+        if ($query === '') {
+            return [];
+        }
+
+        $schema = [
+            'name' => 'keyword_response',
+            'schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'keywords' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                    ],
+                ],
+                'required' => ['keywords'],
+                'additionalProperties' => false,
+            ],
+        ];
+
+        $response = $this->openai->chat_completions([
+            'model' => 'gpt-4o-mini',
+            'temperature' => 0,
+            'response_format' => [
+                'type' => 'json_schema',
+                'json_schema' => $schema,
+            ],
+            'messages' => [
+                [
+                    'role' => 'system',
+                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. Include both English and Japanese forms where applicable. Return only the JSON object matching the schema.',
+                ],
+                [
+                    'role' => 'user',
+                    'content' => "Query:\n{$query}",
+                ],
+            ],
+        ]);
+
+        $content = $response['choices'][0]['message']['content'] ?? null;
+        if (!is_string($content)) {
+            throw new \RuntimeException('OpenAI response missing content.');
+        }
+        $decoded = json_decode($content, true);
+        if (!is_array($decoded)) {
+            throw new \RuntimeException('Failed to decode OpenAI response content.');
+        }
+
+        $keywords = $decoded['keywords'] ?? [];
+        if (!is_array($keywords)) {
+            $keywords = [];
+        }
+
+        $normalized = [];
+        foreach ($keywords as $keyword) {
+            if (!is_string($keyword)) {
+                continue;
+            }
+            $value = trim($keyword);
+            if ($value === '') {
+                continue;
+            }
+            $value = strtolower($value);
+            $value = preg_replace('/\s+/', '-', $value);
+            if ($value !== '') {
+                $normalized[] = $value;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * Returns:
      * ["keyword1", "keyword2", ...]
      */
     public function get_unique_keywords(): array {
