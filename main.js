@@ -284,6 +284,7 @@ function renderNewSourcePage(container) {
 
   let detectedKeywords = [];
   let detectedTitleJa = '';
+  let keywordsDetected = false;
   let latestMatches = null;
   let allowUrlOverride = false;
   let allowKeywordOverride = false;
@@ -307,9 +308,15 @@ function renderNewSourcePage(container) {
     titlePreview.textContent = `日本語タイトル案: ${detectedTitleJa}`;
   }
 
+  function updateButtonStates() {
+    checkButton.disabled = !keywordsDetected;
+    submitButton.disabled = !latestMatches;
+  }
+
   function renderMatches(matches) {
     matchSection.innerHTML = '';
     if (!matches) {
+      updateButtonStates();
       return;
     }
     const urlMatches = matches.url_matches || [];
@@ -419,11 +426,19 @@ function renderNewSourcePage(container) {
     allowKeywordOverride = false;
     matchSection.innerHTML = '';
     confirmSection.classList.add('hidden');
+    updateButtonStates();
   }
 
   [urlInput, titleInput, commentInput].forEach((field) => {
     field.addEventListener('input', () => {
       resetMatches();
+      if (field === titleInput || field === commentInput) {
+        keywordsDetected = false;
+        detectedKeywords = [];
+        detectedTitleJa = '';
+        renderKeywords();
+        renderTitlePreview();
+      }
     });
   });
 
@@ -442,6 +457,7 @@ function renderNewSourcePage(container) {
       if (detectedTitleJa) {
         titleInput.value = detectedTitleJa;
       }
+      keywordsDetected = true;
       renderKeywords();
       renderTitlePreview();
       resetMatches();
@@ -528,6 +544,7 @@ function renderNewSourcePage(container) {
       commentInput.value = '';
       detectedKeywords = [];
       detectedTitleJa = '';
+      keywordsDetected = false;
       latestMatches = null;
       renderKeywords();
       renderTitlePreview();
@@ -560,6 +577,7 @@ function renderNewSourcePage(container) {
 
   renderKeywords();
   renderTitlePreview();
+  updateButtonStates();
   section.appendChild(form);
   container.appendChild(section);
 }
