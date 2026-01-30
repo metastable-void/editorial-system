@@ -54,4 +54,5 @@ class OpenAiConfig {
 abstract class ConfigSchema {
     abstract public static function getMysqlConfig(): MysqlConfig;
     abstract public static function getAdminLogin(): LoginConfig;
+    abstract public static function getOpenAiConfig(): OpenAiConfig;
 }
