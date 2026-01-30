@@ -11,6 +11,9 @@ const api = {
   getUsers() {
     return this.request('/api/users.php');
   },
+  listKeywords() {
+    return this.request('/api/keywords.php');
+  },
   createUser(name) {
     return this.request('/api/users.php', {
       method: 'POST',
@@ -44,6 +47,19 @@ const api = {
     params.set('author_id', String(authorId));
     params.set('state', 'working');
     return this.request(`/api/sources.php?${params.toString()}`);
+  },
+  searchKeywords(query) {
+    const params = new URLSearchParams();
+    params.set('query', query);
+    return this.request(`/api/search-keywords.php?${params.toString()}`);
+  },
+  searchSources(keywords, state) {
+    const params = new URLSearchParams();
+    keywords.forEach((keyword) => params.append('keywords[]', keyword));
+    if (state) {
+      params.set('state', state);
+    }
+    return this.request(`/api/search-sources.php?${params.toString()}`);
   },
   updateSourceState(sourceId, state) {
     return this.request('/api/sources.php', {
@@ -110,6 +126,7 @@ function renderTopbar(container) {
     { hash: '#/users', label: 'ユーザー' },
     { hash: '#/new-source', label: '新規ソース' },
     { hash: '#/sources', label: '作業中ソース' },
+    { hash: '#/keywords', label: 'キーワード' },
   ];
   navLinks.forEach((link) => {
     const a = createElement('a', { text: link.label });
@@ -577,12 +594,199 @@ function renderSourcesPage(container) {
   container.appendChild(section);
 }
 
+function renderKeywordListPage(container) {
+  const section = createElement('section', { className: 'panel' });
+  section.appendChild(createElement('h2', { text: 'キーワード一覧' }));
+  const status = createElement('div', { className: 'status' });
+  section.appendChild(status);
+  const list = createElement('div', { className: 'list' });
+  section.appendChild(list);
+
+  async function loadKeywords() {
+    setStatus(status, '読み込み中...', 'info');
+    try {
+      const result = await api.listKeywords();
+      const keywords = result.keywords || [];
+      list.innerHTML = '';
+      if (keywords.length === 0) {
+        list.appendChild(createElement('div', { className: 'empty', text: 'キーワードがありません。' }));
+      }
+      keywords.forEach((item) => {
+        const keyword = item.keyword || '';
+        const count = item.count ?? 0;
+        const entry = createElement('a', { className: 'list-item link-item' });
+        entry.href = `#/keywords/${encodeURIComponent(keyword)}`;
+        entry.appendChild(createElement('span', { text: keyword }));
+        entry.appendChild(createElement('span', { className: 'muted', text: `${count}件` }));
+        list.appendChild(entry);
+      });
+      setStatus(status, '読み込み完了。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    }
+  }
+
+  loadKeywords();
+  container.appendChild(section);
+}
+
+function renderKeywordDetailPage(container, keyword) {
+  const section = createElement('section', { className: 'panel' });
+  section.appendChild(createElement('h2', { text: `キーワード: ${keyword}` }));
+  const status = createElement('div', { className: 'status' });
+  section.appendChild(status);
+
+  const workingBox = createElement('div', { className: 'match-box' });
+  workingBox.appendChild(createElement('h3', { text: '作業中' }));
+  const workingList = createElement('div', { className: 'list' });
+  workingBox.appendChild(workingList);
+
+  const doneBox = createElement('div', { className: 'match-box' });
+  doneBox.appendChild(createElement('h3', { text: '完了' }));
+  const doneList = createElement('div', { className: 'list' });
+  doneBox.appendChild(doneList);
+
+  section.appendChild(workingBox);
+  section.appendChild(doneBox);
+
+  async function loadState(state, target) {
+    const result = await api.searchSources([keyword], state);
+    const sources = result.sources || [];
+    target.innerHTML = '';
+    if (sources.length === 0) {
+      target.appendChild(createElement('div', { className: 'empty', text: '該当なし' }));
+      return;
+    }
+    sources.forEach((source) => {
+      const item = createElement('div', { className: 'list-item' });
+      const meta = createElement('div', { className: 'source-meta' });
+      meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
+      meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
+      meta.appendChild(createElement('div', { className: 'match-meta', text: source.author_name || '不明' }));
+      if (source.comment) {
+        meta.appendChild(createElement('div', { className: 'source-comment', text: source.comment }));
+      }
+      if (source.keywords) {
+        const keywords = String(source.keywords)
+          .split(',')
+          .map((value) => value.trim())
+          .filter((value) => value !== '');
+        if (keywords.length > 0) {
+          const chips = createElement('div', { className: 'keyword-list' });
+          keywords.forEach((value) => chips.appendChild(createElement('span', { className: 'chip', text: value })));
+          meta.appendChild(chips);
+        }
+      }
+      item.appendChild(meta);
+      target.appendChild(item);
+    });
+  }
+
+  async function loadAll() {
+    setStatus(status, '読み込み中...', 'info');
+    try {
+      await loadState('working', workingList);
+      await loadState('done', doneList);
+      setStatus(status, '読み込み完了。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    }
+  }
+
+  loadAll();
+  container.appendChild(section);
+}
+
+function renderSearchPage(container, query) {
+  const section = createElement('section', { className: 'panel' });
+  section.appendChild(createElement('h2', { text: `検索: ${query}` }));
+  const status = createElement('div', { className: 'status' });
+  const keywordBox = createElement('div', { className: 'keyword-list' });
+  const resultsBox = createElement('div', { className: 'list' });
+  section.appendChild(status);
+  section.appendChild(keywordBox);
+  section.appendChild(resultsBox);
+
+  async function loadSearch() {
+    setStatus(status, '解析中...', 'info');
+    try {
+      const keywordResult = await api.searchKeywords(query);
+      const keywords = Array.isArray(keywordResult.keywords) ? keywordResult.keywords : [];
+      keywordBox.innerHTML = '';
+      if (keywords.length === 0) {
+        keywordBox.appendChild(createElement('div', { className: 'empty', text: 'キーワードが見つかりませんでした。' }));
+        resultsBox.innerHTML = '';
+        setStatus(status, '完了。', 'success');
+        return;
+      }
+      keywords.forEach((value) => keywordBox.appendChild(createElement('span', { className: 'chip', text: value })));
+
+      const [workingResult, doneResult] = await Promise.all([
+        api.searchSources(keywords, 'working'),
+        api.searchSources(keywords, 'done'),
+      ]);
+      const combined = [
+        ...((workingResult.sources || []).map((source) => ({ ...source, state_label: 'working' }))),
+        ...((doneResult.sources || []).map((source) => ({ ...source, state_label: 'done' }))),
+      ];
+      resultsBox.innerHTML = '';
+      if (combined.length === 0) {
+        resultsBox.appendChild(createElement('div', { className: 'empty', text: '該当ソースがありません。' }));
+        setStatus(status, '完了。', 'success');
+        return;
+      }
+      combined.forEach((source) => {
+        const item = createElement('div', { className: 'list-item' });
+        const meta = createElement('div', { className: 'source-meta' });
+        meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
+        meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
+        meta.appendChild(createElement('div', { className: 'match-meta', text: source.author_name || '不明' }));
+        if (source.comment) {
+          meta.appendChild(createElement('div', { className: 'source-comment', text: source.comment }));
+        }
+        if (source.keywords) {
+          const keywords = String(source.keywords)
+            .split(',')
+            .map((value) => value.trim())
+            .filter((value) => value !== '');
+          if (keywords.length > 0) {
+            const chips = createElement('div', { className: 'keyword-list' });
+            keywords.forEach((value) => chips.appendChild(createElement('span', { className: 'chip', text: value })));
+            meta.appendChild(chips);
+          }
+        }
+        item.appendChild(meta);
+        const badge = createElement('span', {
+          className: `state-badge state-${source.state_label}`,
+          text: source.state_label === 'done' ? '完了' : '作業中',
+        });
+        item.appendChild(badge);
+        resultsBox.appendChild(item);
+      });
+      setStatus(status, '完了。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    }
+  }
+
+  loadSearch();
+  container.appendChild(section);
+}
+
 function renderRoute(container) {
   const route = location.hash || '#/new-source';
   if (route === '#/users') {
     renderUsersPage(container);
   } else if (route === '#/sources') {
     renderSourcesPage(container);
+  } else if (route === '#/keywords') {
+    renderKeywordListPage(container);
+  } else if (route.startsWith('#/keywords/')) {
+    const keyword = decodeURIComponent(route.replace('#/keywords/', ''));
+    renderKeywordDetailPage(container, keyword);
+  } else if (route.startsWith('#/search/')) {
+    const query = decodeURIComponent(route.replace('#/search/', ''));
+    renderSearchPage(container, query);
   } else {
     renderNewSourcePage(container);
   }

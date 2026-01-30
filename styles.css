@@ -124,6 +124,17 @@ h2 {
   gap: 12px;
 }
 
+.list-item.link-item {
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.list-item.link-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 22px rgba(15, 90, 83, 0.16);
+}
+
 .list-item .muted {
   color: var(--muted);
   font-size: 13px;
@@ -227,6 +238,7 @@ button:hover {
   border-radius: 14px;
   background: #fffaf5;
   border: 1px solid rgba(0, 0, 0, 0.08);
+  margin-top: 14px;
 }
 
 .match-box.error {
@@ -313,6 +325,25 @@ button:hover {
 .source-comment {
   font-size: 13px;
   color: var(--muted);
+}
+
+.state-badge {
+  align-self: flex-start;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.state-working {
+  color: #144a44;
+  background: rgba(15, 90, 83, 0.18);
+}
+
+.state-done {
+  color: #1c4a2e;
+  background: rgba(44, 110, 76, 0.18);
 }
 
 @media (max-width: 760px) {

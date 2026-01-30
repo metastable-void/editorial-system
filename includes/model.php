@@ -329,12 +329,14 @@ class Model {
 
         $placeholders = implode(',', array_fill(0, count($keywords), '?'));
         $sql = "select s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name as author_name,
-                group_concat(distinct sk.keyword order by sk.keyword separator ',') as matched_keywords,
-                count(distinct sk.keyword) as match_count
+                group_concat(distinct sk_all.keyword order by sk_all.keyword separator ',') as keywords,
+                group_concat(distinct sk_match.keyword order by sk_match.keyword separator ',') as matched_keywords,
+                count(distinct sk_match.keyword) as match_count
             from sources s
             join users u on u.id = s.author_id
-            join sources_keywords sk on sk.source_id = s.id
-            where sk.keyword in ($placeholders) and s.state = ?
+            join sources_keywords sk_match on sk_match.source_id = s.id
+            left join sources_keywords sk_all on sk_all.source_id = s.id
+            where sk_match.keyword in ($placeholders) and s.state = ?
             group by s.id, s.url, s.title, s.comment, s.state, s.author_id, u.name
             order by match_count desc, s.id desc
             limit 1000";
