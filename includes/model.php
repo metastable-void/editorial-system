@@ -453,7 +453,7 @@ class Model {
             'messages' => [
                 [
                     'role' => 'system',
-                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. For proper nouns, whenever feasible, include both Japanese and English variants. Include both English and Japanese forms where applicable. Return only the JSON object matching the schema.',
+                    'content' => 'Extract the most important short keywords (single semantic words) that describe who is involved and what happened. Prefer the most common normalized forms. For proper nouns, whenever feasible, include both Japanese and English variants. Include both English and Japanese forms where applicable. When a broader term for something exists (e.g. Europe for EU), please also include that in the list. Return an expanded keywords list, without making up concepts. Return only the JSON object matching the schema.',
                 ],
                 [
                     'role' => 'user',
