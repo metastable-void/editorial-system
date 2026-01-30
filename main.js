@@ -339,6 +339,7 @@ function renderNewSourcePage(container) {
     if (urlMatches.length === 0 && keywordMatches.length === 0) {
       matchSection.appendChild(createElement('div', { className: 'success-box', text: '重複の可能性は見つかりませんでした。' }));
       confirmSection.classList.add('hidden');
+      updateButtonStates();
       return;
     }
 
