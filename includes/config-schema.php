@@ -16,6 +16,10 @@ class LoginConfig {
     public string $password; // TODO: Hash with sane config
 }
 
+class WordPressConfig {
+    public string $url;
+}
+
 class OpenAiConfig {
     public string $endpoint = 'https://api.openai.com/v1';
     public string $token;
@@ -55,4 +59,5 @@ abstract class ConfigSchema {
     abstract public static function getMysqlConfig(): MysqlConfig;
     abstract public static function getAdminLogin(): LoginConfig;
     abstract public static function getOpenAiConfig(): OpenAiConfig;
+    abstract public static function getWordPressConfig(): WordPressConfig;
 }

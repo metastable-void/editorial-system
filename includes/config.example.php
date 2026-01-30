@@ -40,4 +40,11 @@ class Config extends ConfigSchema {
         $config->token = '...';
         return $config;
     }
+
+    public static function getWordPressConfig(): WordPressConfig
+    {
+        $config = new WordPressConfig;
+        $config->url = 'https://innovatopia.jp';
+        return $config;
+    }
 }

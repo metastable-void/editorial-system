@@ -17,7 +17,7 @@ function json_response(array $data, int $status = 200): never {
     if (!\headers_sent() && !is_cli_request()) {
         \http_response_code($status);
     }
-    echo \json_encode($data);
+    echo \json_encode($data), '\n';
     exit;
 }
 
@@ -61,27 +61,30 @@ if (!\is_file(__DIR__ . '/config.php')) {
 
 require_once __DIR__ . '/config.php';
 
-$login = Config::getAdminLogin();
-$auth_user = $_SERVER['PHP_AUTH_USER'] ?? null;
-$auth_pass = $_SERVER['PHP_AUTH_PW'] ?? null;
-if ($auth_user === null || $auth_pass === null) {
-    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
-    if (\is_string($auth_header) && \strncmp($auth_header, 'Basic ', 6) === 0) {
-        $decoded = \base64_decode(\substr($auth_header, 6), true);
-        if ($decoded !== false) {
-            $parts = \explode(':', $decoded, 2);
-            $auth_user = $parts[0] ?? null;
-            $auth_pass = $parts[1] ?? null;
+if (!is_cli_request()) {
+    $login = Config::getAdminLogin();
+    $auth_user = $_SERVER['PHP_AUTH_USER'] ?? null;
+    $auth_pass = $_SERVER['PHP_AUTH_PW'] ?? null;
+    if ($auth_user === null || $auth_pass === null) {
+        $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
+        if (\is_string($auth_header) && \strncmp($auth_header, 'Basic ', 6) === 0) {
+            $decoded = \base64_decode(\substr($auth_header, 6), true);
+            if ($decoded !== false) {
+                $parts = \explode(':', $decoded, 2);
+                $auth_user = $parts[0] ?? null;
+                $auth_pass = $parts[1] ?? null;
+            }
         }
     }
-}
-if ($auth_user !== $login->username || $auth_pass !== $login->password) {
-    if (is_cli_request()) {
+    if ($auth_user !== $login->username || $auth_pass !== $login->password) {
+        if (is_cli_request()) {
+            return_error_response('Unauthorized');
+        }
+        send_header('WWW-Authenticate: Basic realm="Editorial"');
+        send_header('HTTP/1.1 401 Unauthorized');
         return_error_response('Unauthorized');
     }
-    send_header('WWW-Authenticate: Basic realm="Editorial"');
-    send_header('HTTP/1.1 401 Unauthorized');
-    return_error_response('Unauthorized');
 }
 
+require_once __DIR__ . '/wordpress.php';
 require_once __DIR__ . '/model.php';
