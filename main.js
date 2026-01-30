@@ -418,6 +418,8 @@ function renderNewSourcePage(container) {
       keywordRow.appendChild(createElement('span', { text: 'キーワード一致を無視して登録する' }));
       confirmSection.appendChild(keywordRow);
     }
+
+    updateButtonStates();
   }
 
   function resetMatches() {
