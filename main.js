@@ -118,6 +118,17 @@ function createElement(tag, options = {}) {
   return el;
 }
 
+function renderKeywordChips(keywords) {
+  const wrapper = createElement('div', { className: 'keyword-list' });
+  const unique = [...new Set(keywords)].filter((keyword) => keyword !== '');
+  unique.forEach((keyword) => {
+    const link = createElement('a', { className: 'chip chip-link', text: keyword });
+    link.href = `#/keywords/${encodeURIComponent(keyword)}`;
+    wrapper.appendChild(link);
+  });
+  return wrapper;
+}
+
 function renderTopbar(container) {
   const topbar = createElement('div', { className: 'topbar' });
   const title = createElement('div', { className: 'brand', text: '編集部システム' });
@@ -166,6 +177,26 @@ function renderTopbar(container) {
 
   topbar.appendChild(title);
   topbar.appendChild(nav);
+
+  const searchForm = createElement('form', { className: 'search-form' });
+  const searchInput = createElement('input');
+  searchInput.type = 'search';
+  searchInput.placeholder = 'キーワード検索';
+  const searchButton = createElement('button', { text: '検索' });
+  searchButton.type = 'submit';
+  searchForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const query = searchInput.value.trim();
+    if (!query) {
+      return;
+    }
+    searchInput.value = '';
+    location.hash = `#/search/${encodeURIComponent(query)}`;
+  });
+  searchForm.appendChild(searchInput);
+  searchForm.appendChild(searchButton);
+  topbar.appendChild(searchForm);
+
   topbar.appendChild(userSelectWrap);
   container.appendChild(topbar);
 }
@@ -260,9 +291,7 @@ function renderNewSourcePage(container) {
       keywordsView.appendChild(createElement('div', { className: 'empty', text: 'キーワード未検出' }));
       return;
     }
-    detectedKeywords.forEach((keyword) => {
-      keywordsView.appendChild(createElement('span', { className: 'chip', text: keyword }));
-    });
+    keywordsView.appendChild(renderKeywordChips(detectedKeywords));
   }
 
   function renderMatches(matches) {
@@ -284,8 +313,16 @@ function renderNewSourcePage(container) {
       urlMatches.forEach((match) => {
         const item = createElement('div', { className: 'match-item' });
         item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
-        const keywordLabel = match.keywords ? ` / ${match.keywords}` : '';
-        item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'} / ${match.url || ''}${keywordLabel}` }));
+        item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'} / ${match.url || ''}` }));
+        if (match.keywords) {
+          const keywords = String(match.keywords)
+            .split(',')
+            .map((keyword) => keyword.trim())
+            .filter((keyword) => keyword !== '');
+          if (keywords.length > 0) {
+            item.appendChild(renderKeywordChips(keywords));
+          }
+        }
         if (match.comment) {
           item.appendChild(createElement('div', { className: 'match-comment', text: match.comment }));
         }
@@ -321,11 +358,7 @@ function renderNewSourcePage(container) {
         item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'}` }));
         const uniqueKeywords = [...new Set(match.keywords)].filter((keyword) => keyword !== '');
         if (uniqueKeywords.length > 0) {
-          const chips = createElement('div', { className: 'keyword-list' });
-          uniqueKeywords.forEach((keyword) => {
-            chips.appendChild(createElement('span', { className: 'chip', text: keyword }));
-          });
-          item.appendChild(chips);
+          item.appendChild(renderKeywordChips(uniqueKeywords));
         }
         box.appendChild(item);
       });
@@ -546,11 +579,7 @@ function renderSourcesPage(container) {
             .map((keyword) => keyword.trim())
             .filter((keyword) => keyword !== '');
           if (keywords.length > 0) {
-            const chips = createElement('div', { className: 'keyword-list' });
-            keywords.forEach((keyword) => {
-              chips.appendChild(createElement('span', { className: 'chip', text: keyword }));
-            });
-            meta.appendChild(chips);
+            meta.appendChild(renderKeywordChips(keywords));
           }
         }
         item.appendChild(meta);
@@ -672,9 +701,7 @@ function renderKeywordDetailPage(container, keyword) {
           .map((value) => value.trim())
           .filter((value) => value !== '');
         if (keywords.length > 0) {
-          const chips = createElement('div', { className: 'keyword-list' });
-          keywords.forEach((value) => chips.appendChild(createElement('span', { className: 'chip', text: value })));
-          meta.appendChild(chips);
+          meta.appendChild(renderKeywordChips(keywords));
         }
       }
       item.appendChild(meta);
@@ -719,7 +746,7 @@ function renderSearchPage(container, query) {
         setStatus(status, '完了。', 'success');
         return;
       }
-      keywords.forEach((value) => keywordBox.appendChild(createElement('span', { className: 'chip', text: value })));
+      keywordBox.appendChild(renderKeywordChips(keywords));
 
       const [workingResult, doneResult] = await Promise.all([
         api.searchSources(keywords, 'working'),
@@ -750,9 +777,7 @@ function renderSearchPage(container, query) {
             .map((value) => value.trim())
             .filter((value) => value !== '');
           if (keywords.length > 0) {
-            const chips = createElement('div', { className: 'keyword-list' });
-            keywords.forEach((value) => chips.appendChild(createElement('span', { className: 'chip', text: value })));
-            meta.appendChild(chips);
+            meta.appendChild(renderKeywordChips(keywords));
           }
         }
         item.appendChild(meta);

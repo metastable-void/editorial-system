@@ -88,6 +88,24 @@ body {
   background: var(--surface);
 }
 
+.search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-form input {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  min-width: 180px;
+  background: #fffdf9;
+}
+
+.search-form button {
+  padding: 8px 14px;
+}
+
 .content {
   padding: 32px;
   flex: 1;
@@ -226,6 +244,18 @@ button:hover {
   background: rgba(15, 90, 83, 0.12);
   color: var(--accent);
   font-size: 12px;
+}
+
+.chip-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chip-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 16px rgba(15, 90, 83, 0.16);
 }
 
 .matches {
