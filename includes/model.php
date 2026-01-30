@@ -48,6 +48,8 @@ enum SourceState: int {
 class Model {
     private \mysqli $conn;
     private OpenAiConfig $openai;
+    private const KEYWORDS_LIMIT = 200;
+    private const COMMENT_BYTES_LIMIT = 4000;
     public function __construct(MysqlConfig $config, OpenAiConfig $openai)
     {
         $this->openai = $openai;
@@ -280,6 +282,9 @@ class Model {
      * Adds a source with state=0, and adds keywords. Returns the source ID.
      */
     public function add_source(int $author_id, string $url, string $title, string $comment, array $keywords): int {
+        if (strlen($comment) > self::COMMENT_BYTES_LIMIT) {
+            throw new \RuntimeException('Comment exceeds limit.');
+        }
         $this->conn->begin_transaction();
         try {
             $stmt = $this->conn->prepare('insert into sources (url, title, author_id, comment, state) values (?, ?, ?, ?, 0)');
@@ -306,6 +311,9 @@ class Model {
                 $filtered[] = $value;
             }
             $filtered = array_values(array_unique($filtered));
+            if (count($filtered) > self::KEYWORDS_LIMIT) {
+                throw new \RuntimeException('Too many keywords.');
+            }
 
             if ($filtered) {
                 $placeholders = implode(',', array_fill(0, count($filtered), '(?, ?)'));
