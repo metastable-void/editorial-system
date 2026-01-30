@@ -181,18 +181,33 @@ function renderTopbar(container) {
   const nav = createElement('nav', { className: 'nav' });
   const navLinks = [
     { hash: '#/users', label: 'ユーザー' },
-    { hash: '#/new-source', label: '新規ソース' },
-    { hash: '#/sources', label: '作業中ソース' },
     { hash: '#/keywords', label: 'キーワード' },
   ];
   navLinks.forEach((link) => {
     const a = createElement('a', { text: link.label });
     a.href = link.hash;
-    if (location.hash === link.hash) {
+    if (location.hash.startsWith(link.hash)) {
       a.classList.add('active');
     }
     nav.appendChild(a);
   });
+
+  const sourcesSelect = createElement('select', { className: 'nav-select' });
+  const sourcesOptions = [
+    { hash: '#/new-source', label: '新規ソース' },
+    { hash: '#/sources', label: '作業中ソース' },
+  ];
+  sourcesOptions.forEach((option) => {
+    const opt = createElement('option', { text: option.label });
+    opt.value = option.hash;
+    sourcesSelect.appendChild(opt);
+  });
+  const sourcesActive = location.hash.startsWith('#/sources') ? '#/sources' : '#/new-source';
+  sourcesSelect.value = sourcesActive;
+  sourcesSelect.addEventListener('change', () => {
+    location.hash = sourcesSelect.value;
+  });
+  nav.appendChild(sourcesSelect);
 
   const userSelectWrap = createElement('div', { className: 'author-select' });
   const label = createElement('label', { text: '担当者' });
@@ -1017,11 +1032,55 @@ function renderRoute(container) {
   }
 }
 
+function renderBreadcrumbs(container) {
+  const route = location.hash || '#/new-source';
+  const crumbs = [];
+  if (route.startsWith('#/users/')) {
+    const id = decodeURIComponent(route.replace('#/users/', ''));
+    crumbs.push({ label: 'ユーザー', hash: '#/users' });
+    crumbs.push({ label: `ユーザー #${id}` });
+  } else if (route.startsWith('#/users')) {
+    crumbs.push({ label: 'ユーザー' });
+  } else if (route.startsWith('#/keywords/')) {
+    const keyword = decodeURIComponent(route.replace('#/keywords/', ''));
+    crumbs.push({ label: 'キーワード', hash: '#/keywords' });
+    crumbs.push({ label: keyword });
+  } else if (route.startsWith('#/keywords')) {
+    crumbs.push({ label: 'キーワード' });
+  } else if (route.startsWith('#/search/')) {
+    const query = decodeURIComponent(route.replace('#/search/', ''));
+    crumbs.push({ label: '検索' });
+    crumbs.push({ label: query });
+  } else if (route.startsWith('#/sources')) {
+    crumbs.push({ label: 'ソース' });
+    crumbs.push({ label: '作業中' });
+  } else {
+    crumbs.push({ label: 'ソース' });
+    crumbs.push({ label: '新規登録' });
+  }
+
+  const wrapper = createElement('div', { className: 'breadcrumbs' });
+  crumbs.forEach((crumb, index) => {
+    if (index > 0) {
+      wrapper.appendChild(createElement('span', { className: 'crumb-sep', text: '/' }));
+    }
+    if (crumb.hash) {
+      const link = createElement('a', { text: crumb.label });
+      link.href = crumb.hash;
+      wrapper.appendChild(link);
+    } else {
+      wrapper.appendChild(createElement('span', { text: crumb.label }));
+    }
+  });
+  container.appendChild(wrapper);
+}
+
 function renderApp() {
   const root = document.getElementById('main');
   root.innerHTML = '';
   renderTopbar(root);
   const content = createElement('div', { className: 'content' });
+  renderBreadcrumbs(content);
   renderRoute(content);
   root.appendChild(content);
 }
