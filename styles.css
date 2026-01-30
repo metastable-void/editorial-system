@@ -71,12 +71,55 @@ body {
   background: var(--accent);
 }
 
-.nav-select {
-  padding: 6px 10px;
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown-toggle {
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: var(--surface);
   color: var(--muted);
+  font-size: 14px;
+}
+
+.nav-dropdown-toggle:hover {
+  background: rgba(15, 90, 83, 0.08);
+}
+
+.nav-dropdown-menu {
+  list-style: none;
+  padding: 8px;
+  margin: 8px 0 0;
+  position: absolute;
+  right: 0;
+  min-width: 160px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: none;
+  z-index: 20;
+}
+
+.nav-dropdown.open .nav-dropdown-menu {
+  display: grid;
+  gap: 4px;
+}
+
+.nav-dropdown-menu a {
+  text-decoration: none;
+  color: var(--muted);
+  padding: 8px 10px;
+  border-radius: 8px;
+  display: block;
+}
+
+.nav-dropdown-menu a:hover,
+.nav-dropdown-menu a.active {
+  color: var(--surface);
+  background: var(--accent);
 }
 
 .author-select {

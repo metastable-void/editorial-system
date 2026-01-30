@@ -192,22 +192,36 @@ function renderTopbar(container) {
     nav.appendChild(a);
   });
 
-  const sourcesSelect = createElement('select', { className: 'nav-select' });
+  const sourcesActive = location.hash.startsWith('#/sources') ? '#/sources' : '#/new-source';
+  const sourcesDropdown = createElement('div', { className: 'nav-dropdown' });
+  const sourcesToggle = createElement('button', { className: 'nav-dropdown-toggle', text: 'ソース' });
+  sourcesToggle.type = 'button';
+  const sourcesMenu = createElement('ul', { className: 'nav-dropdown-menu' });
   const sourcesOptions = [
     { hash: '#/new-source', label: '新規ソース' },
     { hash: '#/sources', label: '作業中ソース' },
   ];
   sourcesOptions.forEach((option) => {
-    const opt = createElement('option', { text: option.label });
-    opt.value = option.hash;
-    sourcesSelect.appendChild(opt);
+    const item = createElement('li');
+    const link = createElement('a', { text: option.label });
+    link.href = option.hash;
+    if (sourcesActive === option.hash) {
+      link.classList.add('active');
+    }
+    item.appendChild(link);
+    sourcesMenu.appendChild(item);
   });
-  const sourcesActive = location.hash.startsWith('#/sources') ? '#/sources' : '#/new-source';
-  sourcesSelect.value = sourcesActive;
-  sourcesSelect.addEventListener('change', () => {
-    location.hash = sourcesSelect.value;
+  sourcesToggle.addEventListener('click', () => {
+    sourcesDropdown.classList.toggle('open');
   });
-  nav.appendChild(sourcesSelect);
+  document.addEventListener('click', (event) => {
+    if (!sourcesDropdown.contains(event.target)) {
+      sourcesDropdown.classList.remove('open');
+    }
+  });
+  sourcesDropdown.appendChild(sourcesToggle);
+  sourcesDropdown.appendChild(sourcesMenu);
+  nav.appendChild(sourcesDropdown);
 
   const userSelectWrap = createElement('div', { className: 'author-select' });
   const label = createElement('label', { text: '担当者' });
