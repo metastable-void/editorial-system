@@ -267,11 +267,11 @@ h2 {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .source-draft.hidden {
-  display: none;
+  display: none !important;
 }
 
 .author-row {
@@ -309,6 +309,11 @@ h2 {
 
 .progress {
   width: 100%;
+  display: block;
+}
+
+.progress.hidden {
+  display: none !important;
 }
 
 input,
