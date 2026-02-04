@@ -29,6 +29,8 @@ class FirecrawlConfig {
             'formats' => ['markdown'],
             'onlyMainContent' => true,
             'excludeTags' => ['img'],
+            'proxy' => 'auto',
+            'blockAds' => true,
         ], \JSON_UNESCAPED_UNICODE);
         if (false === $payload) {
             throw new \Exception('JSON encoding error');
