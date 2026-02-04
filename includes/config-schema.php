@@ -86,8 +86,20 @@ class FirecrawlConfig {
         if (!is_array($metadata)) {
             throw new \RuntimeException('Invalid Firecrawl response metadata.');
         }
-        $title = string_strip($metadata['og:title'] ?? $metadata['ogTitle'] ?? $metadata['twitter:title'] ?? $metadata['title'] ?? '');
-        $description = string_strip($metadata['og:description'] ?? $metadata['ogDescription'] ?? $metadata['twitter:description'] ?? $metadata['description'] ?? '');
+        $normalize_meta = static function (mixed $value): string {
+            if (is_array($value)) {
+                $value = implode(' ', $value);
+            }
+            if (is_string($value)) {
+                return $value;
+            }
+            if (is_int($value) || is_float($value) || is_bool($value)) {
+                return (string) $value;
+            }
+            return '';
+        };
+        $title = string_strip($normalize_meta($metadata['og:title'] ?? $metadata['ogTitle'] ?? $metadata['twitter:title'] ?? $metadata['title'] ?? ''));
+        $description = string_strip($normalize_meta($metadata['og:description'] ?? $metadata['ogDescription'] ?? $metadata['twitter:description'] ?? $metadata['description'] ?? ''));
         if ($title == '' && $has_content) {
             $title = preg_match('/^#\s+(.+)$/um', $full_content, $m) ? $m[1] : '';
         }
