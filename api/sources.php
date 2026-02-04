@@ -126,12 +126,58 @@ try {
     if ($method === 'PATCH' || $method === 'PUT') {
         $data = read_json_body();
         $source_id = $data['source_id'] ?? null;
-        $state = $data['state'] ?? null;
         if (!\is_int($source_id)) {
             json_response(['error' => 'Missing or invalid source_id.'], 400);
         }
-        $state_enum = parse_state($state);
-        $model->change_source_state($source_id, $state_enum);
+        $did_update = false;
+
+        if (\array_key_exists('state', $data)) {
+            $state_enum = parse_state($data['state']);
+            $model->change_source_state($source_id, $state_enum);
+            $did_update = true;
+        }
+
+        $has_content_update = \array_key_exists('title', $data)
+            || \array_key_exists('comment', $data)
+            || \array_key_exists('content_md', $data);
+        if ($has_content_update) {
+            $source = $model->get_source_by_id($source_id);
+            if ($source === null) {
+                json_response(['error' => 'Not found.'], 404);
+            }
+            $title = $source['title'] ?? '';
+            $comment = $source['comment'] ?? '';
+            $content_md = $source['content_md'] ?? '';
+
+            if (\array_key_exists('title', $data)) {
+                if (!\is_string($data['title'])) {
+                    json_response(['error' => 'Invalid title.'], 400);
+                }
+                $title = $data['title'];
+            }
+            if (\array_key_exists('comment', $data)) {
+                if (!\is_string($data['comment'])) {
+                    json_response(['error' => 'Invalid comment.'], 400);
+                }
+                $comment = $data['comment'];
+            }
+            if (\array_key_exists('content_md', $data)) {
+                if ($data['content_md'] === null) {
+                    $content_md = '';
+                } elseif (!\is_string($data['content_md'])) {
+                    json_response(['error' => 'Invalid content_md.'], 400);
+                } else {
+                    $content_md = $data['content_md'];
+                }
+            }
+
+            $model->update_source_content($source_id, $title, $comment, $content_md);
+            $did_update = true;
+        }
+
+        if (!$did_update) {
+            json_response(['error' => 'No updates provided.'], 400);
+        }
         json_response(['ok' => true]);
     }
 

@@ -370,6 +370,26 @@ class Model {
     }
 
     /**
+     * Updates title/comment/content_md for a source.
+     */
+    public function update_source_content(int $source_id, string $title, string $comment, string $content_md): void {
+        if (strlen($comment) > self::COMMENT_BYTES_LIMIT) {
+            throw new \RuntimeException('Comment exceeds limit.');
+        }
+        $stmt = $this->conn->prepare('update sources set title = ?, comment = ?, content_md = ?, updated_date = ? where id = ?');
+        if (!$stmt) {
+            throw new \RuntimeException('Failed to prepare update source: ' . $this->conn->error);
+        }
+        $now = time();
+        $stmt->bind_param('sssii', $title, $comment, $content_md, $now, $source_id);
+        if (!$stmt->execute()) {
+            $stmt->close();
+            throw new \RuntimeException('Failed to update source: ' . $this->conn->error);
+        }
+        $stmt->close();
+    }
+
+    /**
      * Returns:
      * [{"id": ..., "url": "...", "title": "...", "comment": "...", "state": ..., "author_id": ..., "author_name": "..."}, ...]
      */

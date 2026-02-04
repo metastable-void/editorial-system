@@ -436,6 +436,36 @@ button:disabled {
   font-weight: 600;
 }
 
+.source-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.source-link:hover {
+  color: var(--accent);
+}
+
+.source-detail-meta {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.source-url {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.source-url:hover {
+  text-decoration: underline;
+}
+
+.textarea-large {
+  min-height: 240px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Roboto Mono", "Noto Sans Mono", monospace;
+}
+
 .source-comment {
   font-size: 13px;
   color: var(--muted);

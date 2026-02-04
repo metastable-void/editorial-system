@@ -62,6 +62,11 @@ const api = {
     params.set('state', 'working');
     return this.request(`/api/sources.php?${params.toString()}`);
   },
+  getSource(sourceId) {
+    const params = new URLSearchParams();
+    params.set('source_id', String(sourceId));
+    return this.request(`/api/sources.php?${params.toString()}`);
+  },
   searchKeywords(query) {
     const params = new URLSearchParams();
     params.set('query', query);
@@ -80,6 +85,13 @@ const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source_id: sourceId, state }),
+    });
+  },
+  updateSource(sourceId, payload) {
+    return this.request('/api/sources.php', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_id: sourceId, ...payload }),
     });
   },
 };
@@ -710,7 +722,12 @@ function renderSourcesPage(container) {
       sources.forEach((source) => {
         const item = createElement('div', { className: 'list-item' });
         const meta = createElement('div', { className: 'source-meta' });
-        meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
+        const titleLink = createElement('a', {
+          className: 'source-title source-link',
+          text: source.title || '(無題)',
+        });
+        titleLink.href = `#/sources/${encodeURIComponent(String(source.id))}`;
+        meta.appendChild(titleLink);
         meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
         const timestamp = renderTimestamp(source.updated_date);
         if (timestamp) {
@@ -767,6 +784,117 @@ function renderSourcesPage(container) {
 
   loadSources();
   container.appendChild(section);
+}
+
+function renderSourceDetailPage(container, sourceId) {
+  const section = createElement('section', { className: 'panel' });
+  section.appendChild(createElement('h2', { text: `ソース #${sourceId}` }));
+  const status = createElement('div', { className: 'status' });
+  const meta = createElement('div', { className: 'source-detail-meta' });
+  const keywordsView = createElement('div', { className: 'keyword-list' });
+
+  const form = createElement('form', { className: 'stack-form' });
+  const titleInput = createElement('input');
+  titleInput.type = 'text';
+  titleInput.placeholder = 'タイトル';
+  const commentInput = document.createElement('textarea');
+  commentInput.placeholder = 'コメント';
+  const contentInput = document.createElement('textarea');
+  contentInput.placeholder = '本文 (Markdown)';
+  contentInput.className = 'textarea-large';
+  const saveButton = createElement('button', { text: '更新する' });
+  saveButton.type = 'submit';
+
+  form.appendChild(titleInput);
+  form.appendChild(commentInput);
+  form.appendChild(contentInput);
+  form.appendChild(saveButton);
+
+  section.appendChild(status);
+  section.appendChild(meta);
+  section.appendChild(keywordsView);
+  section.appendChild(form);
+  container.appendChild(section);
+
+  const sourceNumber = Number(sourceId);
+  if (!Number.isFinite(sourceNumber) || sourceNumber <= 0) {
+    setStatus(status, 'Invalid source_id.', 'error');
+    return;
+  }
+
+  function renderMeta(source) {
+    meta.innerHTML = '';
+    if (source.url) {
+      const link = createElement('a', { className: 'source-url', text: source.url });
+      link.href = source.url;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      meta.appendChild(link);
+    }
+    meta.appendChild(createElement('div', { className: 'muted', text: `担当者: ${source.author_name || '不明'}` }));
+    const timestamp = renderTimestamp(source.updated_date);
+    if (timestamp) {
+      meta.appendChild(timestamp);
+    }
+  }
+
+  function renderKeywords(source) {
+    keywordsView.innerHTML = '';
+    if (!source.keywords) {
+      keywordsView.appendChild(createElement('div', { className: 'empty', text: 'キーワードなし' }));
+      return;
+    }
+    const keywords = String(source.keywords)
+      .split(',')
+      .map((keyword) => keyword.trim())
+      .filter((keyword) => keyword !== '');
+    if (keywords.length === 0) {
+      keywordsView.appendChild(createElement('div', { className: 'empty', text: 'キーワードなし' }));
+      return;
+    }
+    keywordsView.appendChild(renderKeywordChips(keywords));
+  }
+
+  async function loadSource() {
+    setStatus(status, '読み込み中...', 'info');
+    try {
+      const result = await api.getSource(sourceNumber);
+      const source = result.source;
+      if (!source) {
+        setStatus(status, '見つかりませんでした。', 'error');
+        return;
+      }
+      titleInput.value = source.title || '';
+      commentInput.value = source.comment || '';
+      contentInput.value = source.content_md || '';
+      renderMeta(source);
+      renderKeywords(source);
+      setStatus(status, '読み込み完了。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    }
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    setStatus(status, '更新中...', 'info');
+    saveButton.disabled = true;
+    try {
+      await api.updateSource(sourceNumber, {
+        title: titleInput.value.trim(),
+        comment: commentInput.value,
+        content_md: contentInput.value,
+      });
+      await loadSource();
+      setStatus(status, '更新しました。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    } finally {
+      saveButton.disabled = false;
+    }
+  });
+
+  loadSource();
 }
 
 function renderKeywordListPage(container) {
@@ -1030,6 +1158,9 @@ function renderRoute(container) {
     renderUsersPage(container);
   } else if (route === '#/sources') {
     renderSourcesPage(container);
+  } else if (route.startsWith('#/sources/')) {
+    const sourceId = decodeURIComponent(route.replace('#/sources/', ''));
+    renderSourceDetailPage(container, sourceId);
   } else if (route === '#/keywords') {
     renderKeywordListPage(container);
   } else if (route.startsWith('#/keywords/')) {
@@ -1065,6 +1196,10 @@ function renderBreadcrumbs(container) {
     const query = decodeURIComponent(route.replace('#/search/', ''));
     crumbs.push({ label: '検索' });
     crumbs.push({ label: query });
+  } else if (route.startsWith('#/sources/')) {
+    const id = decodeURIComponent(route.replace('#/sources/', ''));
+    crumbs.push({ label: 'ソース', hash: '#/sources' });
+    crumbs.push({ label: `#${id}` });
   } else if (route.startsWith('#/sources')) {
     crumbs.push({ label: 'ソース' });
     crumbs.push({ label: '作業中' });
