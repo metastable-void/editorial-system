@@ -1058,11 +1058,20 @@ function renderSourceDetailPage(container, sourceId) {
   contentInput.className = 'textarea-large';
   const saveButton = createElement('button', { text: '更新する' });
   saveButton.type = 'submit';
+  const actionRow = createElement('div', { className: 'actions' });
+  const doneButton = createElement('button', { text: '完了' });
+  const abortButton = createElement('button', { text: '中止' });
+  doneButton.type = 'button';
+  abortButton.type = 'button';
+
+  actionRow.appendChild(saveButton);
+  actionRow.appendChild(doneButton);
+  actionRow.appendChild(abortButton);
 
   form.appendChild(titleInput);
   form.appendChild(commentInput);
   form.appendChild(contentInput);
-  form.appendChild(saveButton);
+  form.appendChild(actionRow);
 
   section.appendChild(status);
   section.appendChild(meta);
@@ -1133,6 +1142,8 @@ function renderSourceDetailPage(container, sourceId) {
     event.preventDefault();
     setStatus(status, '更新中...', 'info');
     saveButton.disabled = true;
+    doneButton.disabled = true;
+    abortButton.disabled = true;
     try {
       await api.updateSource(sourceNumber, {
         title: titleInput.value.trim(),
@@ -1144,6 +1155,44 @@ function renderSourceDetailPage(container, sourceId) {
     } catch (error) {
       setStatus(status, error.message, 'error');
     } finally {
+      saveButton.disabled = false;
+      doneButton.disabled = false;
+      abortButton.disabled = false;
+    }
+  });
+
+  doneButton.addEventListener('click', async () => {
+    setStatus(status, '更新中...', 'info');
+    doneButton.disabled = true;
+    abortButton.disabled = true;
+    saveButton.disabled = true;
+    try {
+      await api.updateSourceState(sourceNumber, 'done');
+      await loadSource();
+      setStatus(status, '更新しました。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    } finally {
+      doneButton.disabled = false;
+      abortButton.disabled = false;
+      saveButton.disabled = false;
+    }
+  });
+
+  abortButton.addEventListener('click', async () => {
+    setStatus(status, '更新中...', 'info');
+    doneButton.disabled = true;
+    abortButton.disabled = true;
+    saveButton.disabled = true;
+    try {
+      await api.updateSourceState(sourceNumber, 'aborted');
+      await loadSource();
+      setStatus(status, '更新しました。', 'success');
+    } catch (error) {
+      setStatus(status, error.message, 'error');
+    } finally {
+      doneButton.disabled = false;
+      abortButton.disabled = false;
       saveButton.disabled = false;
     }
   });
