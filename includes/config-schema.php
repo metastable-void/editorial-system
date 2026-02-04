@@ -96,6 +96,25 @@ class FirecrawlConfig {
                 ? preg_replace("/\R(?!\R)/u", " ", trim($m[1]))
                 : '';
         }
+        if ($description == '' && $has_content) {
+            $paragraphs = preg_split("/\R{2,}/u", trim($full_content));
+            if (is_array($paragraphs)) {
+                foreach ($paragraphs as $paragraph) {
+                    $paragraph = trim($paragraph);
+                    if ($paragraph === '') {
+                        continue;
+                    }
+                    if (preg_match('/\A#{1,6}\h+/u', $paragraph)) {
+                        continue;
+                    }
+                    if (preg_match('/\A(```|~~~)/u', $paragraph)) {
+                        continue;
+                    }
+                    $description = preg_replace("/\R(?!\R)/u", " ", $paragraph);
+                    break;
+                }
+            }
+        }
 
         $res = new FirecrawlResult;
         $res->description = $description;
