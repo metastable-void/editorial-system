@@ -425,7 +425,20 @@ function renderNewSourcePage(container) {
       box.appendChild(createElement('h3', { text: 'URL一致 (エラー)' }));
       urlMatches.forEach((match) => {
         const item = createElement('div', { className: 'match-item' });
-        item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
+        let matchTitle;
+        if (match.id !== undefined && match.id !== null) {
+          matchTitle = createElement('a', {
+            className: 'match-title source-link',
+            text: match.title || '(無題)',
+          });
+          matchTitle.href = `#/sources/${encodeURIComponent(String(match.id))}`;
+        } else {
+          matchTitle = createElement('span', {
+            className: 'match-title',
+            text: match.title || '(無題)',
+          });
+        }
+        item.appendChild(matchTitle);
         item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'} / ${match.url || ''}` }));
         const timestamp = renderTimestamp(match.updated_date);
         if (timestamp) {
@@ -471,7 +484,20 @@ function renderNewSourcePage(container) {
       });
       grouped.forEach((match) => {
         const item = createElement('div', { className: 'match-item' });
-        item.appendChild(createElement('div', { className: 'match-title', text: match.title || '(無題)' }));
+        let matchTitle;
+        if (match.id !== undefined && match.id !== null) {
+          matchTitle = createElement('a', {
+            className: 'match-title source-link',
+            text: match.title || '(無題)',
+          });
+          matchTitle.href = `#/sources/${encodeURIComponent(String(match.id))}`;
+        } else {
+          matchTitle = createElement('span', {
+            className: 'match-title',
+            text: match.title || '(無題)',
+          });
+        }
+        item.appendChild(matchTitle);
         item.appendChild(createElement('div', { className: 'match-meta', text: `${match.author_name || '不明'}` }));
         const timestamp = renderTimestamp(match.updated_date);
         if (timestamp) {
@@ -963,7 +989,12 @@ function renderKeywordDetailPage(container, keyword) {
       sources.forEach((source) => {
         const item = createElement('div', { className: 'list-item' });
         const meta = createElement('div', { className: 'source-meta' });
-        meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
+        const titleLink = createElement('a', {
+          className: 'source-title source-link',
+          text: source.title || '(無題)',
+        });
+        titleLink.href = `#/sources/${encodeURIComponent(String(source.id))}`;
+        meta.appendChild(titleLink);
         meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
         meta.appendChild(createElement('div', { className: 'match-meta', text: source.author_name || '不明' }));
         const timestamp = renderTimestamp(source.updated_date);
@@ -1043,7 +1074,12 @@ function renderSearchPage(container, query) {
       combined.forEach((source) => {
         const item = createElement('div', { className: 'list-item' });
         const meta = createElement('div', { className: 'source-meta' });
-        meta.appendChild(createElement('div', { className: 'source-title', text: source.title || '(無題)' }));
+        const titleLink = createElement('a', {
+          className: 'source-title source-link',
+          text: source.title || '(無題)',
+        });
+        titleLink.href = `#/sources/${encodeURIComponent(String(source.id))}`;
+        meta.appendChild(titleLink);
         meta.appendChild(createElement('div', { className: 'muted', text: source.url }));
         meta.appendChild(createElement('div', { className: 'match-meta', text: source.author_name || '不明' }));
         const timestamp = renderTimestamp(source.updated_date);

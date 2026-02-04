@@ -81,7 +81,7 @@ class Model {
         ];
 
         $state_value = $state->value;
-        $stmt = $this->conn->prepare('select s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.url = ? and s.state = ? group by s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name order by s.id desc limit 1');
+        $stmt = $this->conn->prepare('select s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.url = ? and s.state = ? group by s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name order by s.id desc limit 1');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare URL query: ' . $this->conn->error);
         }
