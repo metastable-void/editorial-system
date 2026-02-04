@@ -1101,6 +1101,35 @@ function renderSourceDetailPage(container, sourceId) {
     }
   }
 
+  function updateStateButtons(state) {
+    if (state === null || state === undefined) {
+      doneButton.disabled = false;
+      abortButton.disabled = false;
+      doneButton.classList.remove('hidden');
+      abortButton.classList.remove('hidden');
+      return;
+    }
+    const numericState = Number(state);
+    if (numericState === 1) {
+      doneButton.disabled = true;
+      abortButton.disabled = true;
+      doneButton.classList.add('hidden');
+      abortButton.classList.add('hidden');
+      return;
+    }
+    if (numericState === -1) {
+      abortButton.disabled = true;
+      doneButton.disabled = true;
+      abortButton.classList.add('hidden');
+      doneButton.classList.add('hidden');
+      return;
+    }
+    doneButton.disabled = false;
+    abortButton.disabled = false;
+    doneButton.classList.remove('hidden');
+    abortButton.classList.remove('hidden');
+  }
+
   function renderKeywords(source) {
     keywordsView.innerHTML = '';
     if (!source.keywords) {
@@ -1132,6 +1161,7 @@ function renderSourceDetailPage(container, sourceId) {
       contentInput.value = source.content_md || '';
       renderMeta(source);
       renderKeywords(source);
+      updateStateButtons(source.state);
       setStatus(status, '読み込み完了。', 'success');
     } catch (error) {
       setStatus(status, error.message, 'error');
@@ -1168,8 +1198,7 @@ function renderSourceDetailPage(container, sourceId) {
     saveButton.disabled = true;
     try {
       await api.updateSourceState(sourceNumber, 'done');
-      await loadSource();
-      setStatus(status, '更新しました。', 'success');
+      location.hash = '#/sources';
     } catch (error) {
       setStatus(status, error.message, 'error');
     } finally {
@@ -1186,8 +1215,7 @@ function renderSourceDetailPage(container, sourceId) {
     saveButton.disabled = true;
     try {
       await api.updateSourceState(sourceNumber, 'aborted');
-      await loadSource();
-      setStatus(status, '更新しました。', 'success');
+      location.hash = '#/sources';
     } catch (error) {
       setStatus(status, error.message, 'error');
     } finally {
