@@ -42,6 +42,20 @@ const api = {
       body: JSON.stringify({ title, comment }),
     });
   },
+  crawlSource(url) {
+    return this.request('/api/crawl.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+  },
+  detectKeywordsWithUrl(title, comment, url) {
+    return this.request('/api/detect-keywords.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, comment, url }),
+    });
+  },
   checkSources(url, keywords) {
     const params = new URLSearchParams();
     params.set('url', url);
@@ -102,6 +116,7 @@ const appState = {
   selectedAuthorId: null,
   pageRefresher: null,
   isRefreshing: false,
+  authorChangeHandler: null,
 };
 
 function normalizeUsers(users) {
@@ -337,6 +352,12 @@ function renderTopbar(container) {
     } else {
       localStorage.removeItem(storageKey);
     }
+    if (typeof appState.authorChangeHandler === 'function') {
+      const handled = appState.authorChangeHandler(selected);
+      if (handled) {
+        return;
+      }
+    }
     renderApp();
   });
   userSelectWrap.appendChild(label);
@@ -429,67 +450,126 @@ function renderUsersPage(container) {
 function renderNewSourcePage(container) {
   const section = createElement('section', { className: 'panel' });
   section.appendChild(createElement('h2', { text: '新規ソース登録' }));
-
-  const form = createElement('form', { className: 'stack-form' });
+  const status = createElement('div', { className: 'status' });
+  const urlRow = createElement('div', { className: 'url-row' });
   const urlInput = createElement('input');
   urlInput.type = 'text';
   urlInput.placeholder = 'URL';
+  const fetchButton = createElement('button', { text: 'URL取得' });
+  fetchButton.type = 'button';
+  urlRow.appendChild(urlInput);
+  urlRow.appendChild(fetchButton);
+
+  const progress = document.createElement('progress');
+  progress.className = 'progress hidden';
+
+  const detail = createElement('div', { className: 'source-draft hidden' });
+  const authorRow = createElement('div', { className: 'author-row' });
+  const authorName = createElement('div', { className: 'author-name' });
+  const confirmButton = createElement('button', { text: '重複確認' });
+  confirmButton.type = 'button';
+  authorRow.appendChild(authorName);
+  authorRow.appendChild(confirmButton);
+
   const titleInput = createElement('input');
   titleInput.type = 'text';
   titleInput.placeholder = 'タイトル';
   titleInput.classList.add('title-input');
-  const titlePreview = createElement('div', { className: 'hint' });
   const commentInput = document.createElement('textarea');
   commentInput.placeholder = 'コメント';
+  const contentInput = document.createElement('textarea');
+  contentInput.placeholder = '本文 (Markdown)';
+  contentInput.className = 'textarea-large';
 
-  const keywordsView = createElement('div', { className: 'keyword-list' });
-  const keywordButton = createElement('button', { text: 'キーワード検出' });
-  keywordButton.type = 'button';
+  detail.appendChild(authorRow);
+  detail.appendChild(titleInput);
+  detail.appendChild(commentInput);
+  detail.appendChild(contentInput);
 
-  const checkButton = createElement('button', { text: '重複チェック' });
-  checkButton.type = 'button';
-  const submitButton = createElement('button', { text: '登録する' });
-  submitButton.type = 'submit';
-
-  const status = createElement('div', { className: 'status' });
+  const dialog = document.createElement('dialog');
+  dialog.className = 'modal';
+  const dialogTitle = createElement('h3', { text: '重複チェック' });
+  const dialogStatus = createElement('div', { className: 'status' });
   const matchSection = createElement('div', { className: 'matches' });
   const confirmSection = createElement('div', { className: 'confirm hidden' });
+  const dialogActions = createElement('div', { className: 'actions' });
+  const cancelButton = createElement('button', { text: 'キャンセル' });
+  cancelButton.type = 'button';
+  const commitButton = createElement('button', { text: '登録する' });
+  commitButton.type = 'button';
+  commitButton.disabled = true;
+  dialogActions.appendChild(cancelButton);
+  dialogActions.appendChild(commitButton);
 
-  let detectedKeywords = [];
-  let detectedTitleJa = '';
-  let keywordsDetected = false;
+  dialog.appendChild(dialogTitle);
+  dialog.appendChild(dialogStatus);
+  dialog.appendChild(matchSection);
+  dialog.appendChild(confirmSection);
+  dialog.appendChild(dialogActions);
+
+  section.appendChild(urlRow);
+  section.appendChild(progress);
+  section.appendChild(detail);
+  section.appendChild(status);
+  section.appendChild(dialog);
+  container.appendChild(section);
+
   let latestMatches = null;
   let allowUrlOverride = false;
   let allowKeywordOverride = false;
   let sanitizedUrl = '';
   let hasQuery = false;
+  let detectedKeywords = [];
+  let lastProcessedUrl = '';
 
-  function renderKeywords() {
-    keywordsView.innerHTML = '';
-    if (detectedKeywords.length === 0) {
-      keywordsView.appendChild(createElement('div', { className: 'empty', text: 'キーワード未検出' }));
-      return;
-    }
-    keywordsView.appendChild(renderKeywordChips(detectedKeywords));
+  function updateAuthorName() {
+    const selectedId = appState.selectedAuthorId;
+    const user = appState.users.find((entry) => entry.id === selectedId);
+    authorName.textContent = user ? user.name : '担当者未選択';
   }
 
-  function renderTitlePreview() {
-    if (!detectedTitleJa) {
-      titlePreview.textContent = '';
-      return;
-    }
-    titlePreview.textContent = `日本語タイトル案: ${detectedTitleJa}`;
+  function resetMatches() {
+    latestMatches = null;
+    allowUrlOverride = false;
+    allowKeywordOverride = false;
+    matchSection.innerHTML = '';
+    confirmSection.classList.add('hidden');
   }
 
-  function updateButtonStates() {
-    checkButton.disabled = !keywordsDetected;
-    submitButton.disabled = !latestMatches || !appState.selectedAuthorId;
+  function resetToUrlOnly() {
+    detail.classList.add('hidden');
+    progress.classList.add('hidden');
+    titleInput.value = '';
+    commentInput.value = '';
+    contentInput.value = '';
+    detectedKeywords = [];
+    lastProcessedUrl = '';
+    resetMatches();
+    setStatus(status, '', 'info');
+  }
+
+  function updateCommitState() {
+    if (!latestMatches || !appState.selectedAuthorId) {
+      commitButton.disabled = true;
+      return;
+    }
+    const urlMatches = latestMatches.url_matches || [];
+    const keywordMatches = latestMatches.keyword_matches || [];
+    if (urlMatches.length > 0 && !allowUrlOverride) {
+      commitButton.disabled = true;
+      return;
+    }
+    if (keywordMatches.length > 0 && !allowKeywordOverride) {
+      commitButton.disabled = true;
+      return;
+    }
+    commitButton.disabled = false;
   }
 
   function renderMatches(matches) {
     matchSection.innerHTML = '';
     if (!matches) {
-      updateButtonStates();
+      updateCommitState();
       return;
     }
     const urlMatches = matches.url_matches || [];
@@ -497,7 +577,7 @@ function renderNewSourcePage(container) {
     if (urlMatches.length === 0 && keywordMatches.length === 0) {
       matchSection.appendChild(createElement('div', { className: 'success-box', text: '重複の可能性は見つかりませんでした。' }));
       confirmSection.classList.add('hidden');
-      updateButtonStates();
+      updateCommitState();
       return;
     }
 
@@ -606,6 +686,7 @@ function renderNewSourcePage(container) {
       checkbox.disabled = !hasQuery;
       checkbox.addEventListener('change', () => {
         allowUrlOverride = checkbox.checked;
+        updateCommitState();
       });
       urlRow.appendChild(checkbox);
       urlRow.appendChild(createElement('span', { text: 'URL一致を無視して登録する' }));
@@ -621,188 +702,200 @@ function renderNewSourcePage(container) {
       checkbox.type = 'checkbox';
       checkbox.addEventListener('change', () => {
         allowKeywordOverride = checkbox.checked;
+        updateCommitState();
       });
       keywordRow.appendChild(checkbox);
       keywordRow.appendChild(createElement('span', { text: 'キーワード一致を無視して登録する' }));
       confirmSection.appendChild(keywordRow);
     }
 
-    updateButtonStates();
+    updateCommitState();
   }
 
-  function resetMatches() {
-    latestMatches = null;
-    allowUrlOverride = false;
-    allowKeywordOverride = false;
-    matchSection.innerHTML = '';
-    confirmSection.classList.add('hidden');
-    updateButtonStates();
-  }
-
-  appState.pageRefresher = null;
-
-  [urlInput, titleInput, commentInput].forEach((field) => {
-    field.addEventListener('input', () => {
-      resetMatches();
-      if (field === titleInput || field === commentInput) {
-        keywordsDetected = false;
-        detectedKeywords = [];
-        detectedTitleJa = '';
-        renderKeywords();
-        renderTitlePreview();
-      }
-    });
-  });
-
-  keywordButton.addEventListener('click', async () => {
-    const title = titleInput.value.trim();
-    const comment = commentInput.value.trim();
-    if (!title && !comment) {
-      setStatus(status, 'タイトルかコメントを入力してください。', 'error');
+  async function processUrl() {
+    const rawUrl = urlInput.value.trim();
+    if (!rawUrl) {
+      resetToUrlOnly();
       return;
     }
-    setStatus(status, 'キーワード検出中...', 'info');
+    if (rawUrl === lastProcessedUrl) {
+      return;
+    }
+    detail.classList.add('hidden');
+    resetMatches();
+    let parsed;
     try {
-      const result = await api.detectKeywords(title, comment);
-      detectedKeywords = Array.isArray(result.keywords) ? result.keywords : [];
-      detectedTitleJa = typeof result.title_ja === 'string' ? result.title_ja.trim() : '';
-      if (detectedTitleJa) {
-        titleInput.value = detectedTitleJa;
-      }
-      keywordsDetected = true;
-      renderKeywords();
-      renderTitlePreview();
+      parsed = new URL(rawUrl);
+    } catch (error) {
+      setStatus(status, 'URLが不正です。', 'error');
+      return;
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      setStatus(status, 'URLが不正です。', 'error');
+      return;
+    }
+    setStatus(status, '取得中...', 'info');
+    progress.classList.remove('hidden');
+    fetchButton.disabled = true;
+    try {
+      const crawlResult = await api.crawlSource(rawUrl);
+      const description = typeof crawlResult.description === 'string' ? crawlResult.description : '';
+      const crawlTitle = typeof crawlResult.title === 'string' ? crawlResult.title : '';
+      const mdContent = typeof crawlResult.md_content === 'string' ? crawlResult.md_content : '';
+      const keywordResult = await api.detectKeywordsWithUrl(crawlTitle, description, rawUrl);
+      detectedKeywords = Array.isArray(keywordResult.keywords) ? keywordResult.keywords : [];
+      const titleJa = typeof keywordResult.title_ja === 'string' ? keywordResult.title_ja.trim() : '';
+      titleInput.value = titleJa;
+      commentInput.value = description;
+      contentInput.value = mdContent;
+      detail.classList.remove('hidden');
+      lastProcessedUrl = rawUrl;
+      updateAuthorName();
       resetMatches();
-      setStatus(status, '検出完了。', 'success');
+      setStatus(status, '取得完了。', 'success');
     } catch (error) {
       setStatus(status, error.message, 'error');
+    } finally {
+      fetchButton.disabled = false;
+      progress.classList.add('hidden');
     }
-  });
+  }
 
-  checkButton.addEventListener('click', async () => {
-    const urlRaw = urlInput.value.trim();
-    if (!urlRaw) {
+  async function openDupCheck() {
+    if (!lastProcessedUrl) {
       setStatus(status, 'URLを入力してください。', 'error');
       return;
     }
-    const normalized = sanitizeUrl(urlRaw);
+    const normalized = sanitizeUrl(lastProcessedUrl);
     sanitizedUrl = normalized.value;
     hasQuery = normalized.hasQuery;
     if (!sanitizedUrl) {
       setStatus(status, 'URLが不正です。', 'error');
       return;
     }
-    setStatus(status, '重複チェック中...', 'info');
-    allowUrlOverride = false;
-    allowKeywordOverride = false;
+    resetMatches();
+    latestMatches = null;
+    updateCommitState();
+    dialogStatus.textContent = '重複チェック中...';
+    dialogStatus.dataset.tone = 'info';
+    dialog.showModal();
     try {
       const result = await api.checkSources(sanitizedUrl, detectedKeywords);
       latestMatches = result;
       renderMatches(result);
-      setStatus(status, 'チェック完了。', 'success');
+      dialogStatus.textContent = 'チェック完了。';
+      dialogStatus.dataset.tone = 'success';
     } catch (error) {
-      setStatus(status, error.message, 'error');
+      dialogStatus.textContent = error.message;
+      dialogStatus.dataset.tone = 'error';
     }
-  });
+  }
 
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  async function commitSource() {
     if (!appState.selectedAuthorId) {
-      setStatus(status, '担当者を選択してください。', 'error');
+      dialogStatus.textContent = '担当者を選択してください。';
+      dialogStatus.dataset.tone = 'error';
       return;
     }
     if (!latestMatches) {
-      setStatus(status, '重複チェックを実行してください。', 'error');
+      dialogStatus.textContent = '重複チェックを実行してください。';
+      dialogStatus.dataset.tone = 'error';
       return;
     }
+    if ((latestMatches.url_matches || []).length > 0 && !allowUrlOverride) {
+      dialogStatus.textContent = 'URL一致の確認が必要です。';
+      dialogStatus.dataset.tone = 'error';
+      return;
+    }
+    if ((latestMatches.keyword_matches || []).length > 0 && !allowKeywordOverride) {
+      dialogStatus.textContent = 'キーワード一致の確認が必要です。';
+      dialogStatus.dataset.tone = 'error';
+      return;
+    }
+    if ((latestMatches.url_matches || []).length > 0 && !hasQuery) {
+      dialogStatus.textContent = 'クエリを含むURLのみURL一致を無視できます。';
+      dialogStatus.dataset.tone = 'error';
+      return;
+    }
+    dialogStatus.textContent = '登録中...';
+    dialogStatus.dataset.tone = 'info';
     try {
       const counts = await api.getUserCounts(appState.selectedAuthorId);
       const workingCount = counts.counts ? counts.counts.working : 0;
       if (workingCount >= WORKING_SOURCES_LIMIT) {
-        setStatus(status, `作業中の上限（${WORKING_SOURCES_LIMIT}件）に達しています。`, 'error');
+        dialogStatus.textContent = `作業中の上限（${WORKING_SOURCES_LIMIT}件）に達しています。`;
+        dialogStatus.dataset.tone = 'error';
         return;
       }
     } catch (error) {
-      setStatus(status, error.message, 'error');
+      dialogStatus.textContent = error.message;
+      dialogStatus.dataset.tone = 'error';
       return;
     }
-    const urlRaw = urlInput.value.trim();
     const title = titleInput.value.trim();
-    const comment = commentInput.value.trim();
-    if (!urlRaw || !title) {
-      setStatus(status, 'URLとタイトルを入力してください。', 'error');
+    if (!title) {
+      dialogStatus.textContent = 'タイトルを入力してください。';
+      dialogStatus.dataset.tone = 'error';
       return;
     }
-    const normalized = sanitizeUrl(urlRaw);
-    sanitizedUrl = normalized.value;
-    hasQuery = normalized.hasQuery;
-    if (!sanitizedUrl) {
-      setStatus(status, 'URLが不正です。', 'error');
-      return;
-    }
-    if (latestMatches && (latestMatches.url_matches || []).length > 0 && !allowUrlOverride) {
-      setStatus(status, 'URL一致の確認が必要です。', 'error');
-      return;
-    }
-    if (latestMatches && (latestMatches.keyword_matches || []).length > 0 && !allowKeywordOverride) {
-      setStatus(status, 'キーワード一致の確認が必要です。', 'error');
-      return;
-    }
-    if ((latestMatches && (latestMatches.url_matches || []).length > 0) && !hasQuery) {
-      setStatus(status, 'クエリを含むURLのみURL一致を無視できます。', 'error');
-      return;
-    }
-    setStatus(status, '登録中...', 'info');
     try {
-      const payload = {
+      await api.createSource({
         author_id: appState.selectedAuthorId,
         url: sanitizedUrl,
         title,
-        comment,
+        comment: commentInput.value,
+        content_md: contentInput.value,
         keywords: detectedKeywords,
-      };
-      await api.createSource(payload);
-      urlInput.value = '';
-      titleInput.value = '';
-      commentInput.value = '';
-      detectedKeywords = [];
-      detectedTitleJa = '';
-      keywordsDetected = false;
-      latestMatches = null;
-      renderKeywords();
-      renderTitlePreview();
-      matchSection.innerHTML = '';
-      confirmSection.classList.add('hidden');
-      setStatus(status, '登録しました。', 'success');
+      });
+      dialog.close('commit');
+      location.hash = '#/sources';
     } catch (error) {
-      setStatus(status, error.message, 'error');
+      dialogStatus.textContent = error.message;
+      dialogStatus.dataset.tone = 'error';
+    }
+  }
+
+  urlInput.addEventListener('change', () => {
+    processUrl();
+  });
+
+  urlInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      processUrl();
     }
   });
 
-  const authorNote = createElement('div', { className: 'hint', text: '担当者は画面上部で選択します。' });
+  fetchButton.addEventListener('click', () => {
+    processUrl();
+  });
 
-  form.appendChild(authorNote);
-  form.appendChild(urlInput);
-  form.appendChild(titleInput);
-  form.appendChild(titlePreview);
-  form.appendChild(commentInput);
+  confirmButton.addEventListener('click', () => {
+    openDupCheck();
+  });
 
-  const actions = createElement('div', { className: 'actions' });
-  actions.appendChild(keywordButton);
-  actions.appendChild(checkButton);
-  actions.appendChild(submitButton);
+  cancelButton.addEventListener('click', () => {
+    dialog.close('cancel');
+  });
 
-  form.appendChild(actions);
-  form.appendChild(keywordsView);
-  form.appendChild(matchSection);
-  form.appendChild(confirmSection);
-  form.appendChild(status);
+  commitButton.addEventListener('click', () => {
+    commitSource();
+  });
 
-  renderKeywords();
-  renderTitlePreview();
-  updateButtonStates();
-  section.appendChild(form);
-  container.appendChild(section);
+  dialog.addEventListener('close', () => {
+    updateCommitState();
+    if (dialog.returnValue === 'cancel' || dialog.returnValue === '') {
+      resetToUrlOnly();
+      urlInput.focus();
+    }
+  });
+
+  appState.pageRefresher = null;
+  appState.authorChangeHandler = () => {
+    updateAuthorName();
+    return true;
+  };
+  updateAuthorName();
 }
 
 function renderSourcesPage(container) {
@@ -1281,6 +1374,7 @@ function renderUserDetailPage(container, userId) {
 function renderRoute(container) {
   const route = location.hash || '#/new-source';
   appState.pageRefresher = null;
+  appState.authorChangeHandler = null;
   if (route === '#/users') {
     renderUsersPage(container);
   } else if (route === '#/sources') {

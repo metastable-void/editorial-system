@@ -250,6 +250,63 @@ h2 {
   gap: 14px;
 }
 
+.hidden {
+  display: none;
+}
+
+.url-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.url-row input {
+  flex: 1;
+}
+
+.source-draft {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.author-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--surface-alt);
+}
+
+.author-name {
+  font-weight: 600;
+  color: var(--error);
+}
+
+.modal {
+  border: none;
+  border-radius: 18px;
+  padding: 20px;
+  width: min(760px, calc(100% - 32px));
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.modal h3 {
+  margin-top: 0;
+}
+
+.modal::backdrop {
+  background: rgba(15, 10, 6, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.progress {
+  width: 100%;
+}
+
 input,
 textarea,
 button {
