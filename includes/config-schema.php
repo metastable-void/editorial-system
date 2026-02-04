@@ -30,6 +30,11 @@ class FirecrawlConfig {
             'onlyMainContent' => true,
             'excludeTags' => ['img'],
         ], \JSON_UNESCAPED_UNICODE);
+        if (false === $payload) {
+            throw new \Exception('JSON encoding error');
+        }
+
+        // cURL handles are automatically cleaned as of PHP 8.x.
         $ch = curl_init('https://api.firecrawl.dev/v2/scrape');
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
@@ -39,13 +44,16 @@ class FirecrawlConfig {
                 'Authorization: Bearer ' . $this->api_key,
             ],
             CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_TIMEOUT => 40,
+            CURLOPT_CONNECTTIMEOUT => 15,
         ]);
         $response = curl_exec($ch);
         if ($response === false) {
             $error = curl_error($ch);
-            $ch = null;
+            unset($ch);
             throw new \RuntimeException('Firecrawl request failed: ' . $error);
         }
+        unset($ch);
         $decoded = json_decode($response, true);
         if (!is_array($decoded)) {
             throw new \RuntimeException('Failed to decode Firecrawl response.');
@@ -111,6 +119,8 @@ class OpenAiConfig {
         if ($payload === false) {
             throw new \RuntimeException('Failed to encode request payload.');
         }
+        
+        // cURL handles are automatically cleaned as of PHP 8.x.
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_POST => true,

@@ -2,6 +2,11 @@
 
 namespace innovatopia_jp\editorial;
 
+if (\PHP_VERSION_ID < 80000) {
+    echo 'PHP >= 8 is required.' . \PHP_EOL;
+    exit;
+}
+
 function string_strip(string $str): string {
     return preg_replace('/^\s+|\s+$/u', '', $str);
 }
