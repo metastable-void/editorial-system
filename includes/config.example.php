@@ -47,4 +47,11 @@ class Config extends ConfigSchema {
         $config->url = 'https://innovatopia.jp';
         return $config;
     }
+
+    public static function getFirecrawlConfig(): FirecrawlConfig
+    {
+        $config = new FirecrawlConfig;
+        $config->api_key = '...';
+        return $config;
+    }
 }

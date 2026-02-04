@@ -2,6 +2,10 @@
 
 namespace innovatopia_jp\editorial;
 
+function string_strip(string $str): string {
+    return preg_replace('/^\s+|\s+$/u', '', $str);
+}
+
 function is_cli_request(): bool {
     return \PHP_SAPI === 'cli' || \PHP_SAPI === 'phpdbg';
 }
