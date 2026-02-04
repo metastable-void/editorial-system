@@ -489,6 +489,7 @@ function renderNewSourcePage(container) {
   const dialog = document.createElement('dialog');
   dialog.className = 'modal';
   const dialogTitle = createElement('h3', { text: '重複チェック' });
+  const dialogKeywords = createElement('div', { className: 'keyword-list' });
   const dialogStatus = createElement('div', { className: 'status' });
   const matchSection = createElement('div', { className: 'matches' });
   const confirmSection = createElement('div', { className: 'confirm hidden' });
@@ -502,6 +503,7 @@ function renderNewSourcePage(container) {
   dialogActions.appendChild(commitButton);
 
   dialog.appendChild(dialogTitle);
+  dialog.appendChild(dialogKeywords);
   dialog.appendChild(dialogStatus);
   dialog.appendChild(matchSection);
   dialog.appendChild(confirmSection);
@@ -521,6 +523,9 @@ function renderNewSourcePage(container) {
   let hasQuery = false;
   let detectedKeywords = [];
   let lastProcessedUrl = '';
+  let lastDetectPayload = null;
+  let originalTitle = '';
+  let translatedTitle = '';
 
   function updateAuthorName() {
     const selectedId = appState.selectedAuthorId;
@@ -712,6 +717,15 @@ function renderNewSourcePage(container) {
     updateCommitState();
   }
 
+  function renderDialogKeywords() {
+    dialogKeywords.innerHTML = '';
+    if (!detectedKeywords || detectedKeywords.length === 0) {
+      dialogKeywords.appendChild(createElement('div', { className: 'empty', text: 'キーワード未検出' }));
+      return;
+    }
+    dialogKeywords.appendChild(renderKeywordChips(detectedKeywords));
+  }
+
   async function processUrl() {
     const rawUrl = urlInput.value.trim();
     if (!rawUrl) {
@@ -742,14 +756,17 @@ function renderNewSourcePage(container) {
       const description = typeof crawlResult.description === 'string' ? crawlResult.description : '';
       const crawlTitle = typeof crawlResult.title === 'string' ? crawlResult.title : '';
       const mdContent = typeof crawlResult.md_content === 'string' ? crawlResult.md_content : '';
+      originalTitle = crawlTitle;
       const keywordResult = await api.detectKeywordsWithUrl(crawlTitle, description, rawUrl);
       detectedKeywords = Array.isArray(keywordResult.keywords) ? keywordResult.keywords : [];
       const titleJa = typeof keywordResult.title_ja === 'string' ? keywordResult.title_ja.trim() : '';
+      translatedTitle = titleJa;
       titleInput.value = titleJa;
       commentInput.value = description;
       contentInput.value = mdContent;
       detail.classList.remove('hidden');
       lastProcessedUrl = rawUrl;
+      lastDetectPayload = { title: crawlTitle, comment: description, url: rawUrl };
       updateAuthorName();
       resetMatches();
       setStatus(status, '取得完了。', 'success');
@@ -766,6 +783,38 @@ function renderNewSourcePage(container) {
       setStatus(status, 'URLを入力してください。', 'error');
       return;
     }
+    const currentTitle = titleInput.value.trim();
+    const currentComment = commentInput.value.trim();
+    const detectTitle = translatedTitle && currentTitle === translatedTitle ? originalTitle : currentTitle;
+    const detectPayload = { title: detectTitle, comment: currentComment, url: lastProcessedUrl };
+    const needsDetect =
+      !lastDetectPayload
+      || lastDetectPayload.title !== detectPayload.title
+      || lastDetectPayload.comment !== detectPayload.comment
+      || lastDetectPayload.url !== detectPayload.url;
+    if (needsDetect) {
+      setStatus(status, 'キーワード検出中...', 'info');
+      try {
+        const keywordResult = await api.detectKeywordsWithUrl(
+          detectPayload.title,
+          detectPayload.comment,
+          detectPayload.url
+        );
+        detectedKeywords = Array.isArray(keywordResult.keywords) ? keywordResult.keywords : [];
+        const titleJa = typeof keywordResult.title_ja === 'string' ? keywordResult.title_ja.trim() : '';
+        if (!titleInput.value.trim() && titleJa) {
+          titleInput.value = titleJa;
+        }
+        if (titleJa) {
+          translatedTitle = titleJa;
+        }
+        lastDetectPayload = detectPayload;
+        setStatus(status, 'キーワード更新完了。', 'success');
+      } catch (error) {
+        setStatus(status, error.message, 'error');
+        return;
+      }
+    }
     const normalized = sanitizeUrl(lastProcessedUrl);
     sanitizedUrl = normalized.value;
     hasQuery = normalized.hasQuery;
@@ -776,6 +825,7 @@ function renderNewSourcePage(container) {
     resetMatches();
     latestMatches = null;
     updateCommitState();
+    renderDialogKeywords();
     dialogStatus.textContent = '重複チェック中...';
     dialogStatus.dataset.tone = 'info';
     dialog.showModal();
