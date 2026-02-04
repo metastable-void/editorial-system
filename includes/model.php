@@ -353,7 +353,7 @@ class Model {
      * Returns a source row or null.
      */
     public function get_source_by_id(int $source_id): ?array {
-        $stmt = $this->conn->prepare('select id, url, title, author_id, comment, content_md, state, updated_date from sources where id = ? limit 1');
+        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.author_id, s.comment, s.content_md, s.state, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.id = ? group by s.id, s.url, s.title, s.author_id, s.comment, s.content_md, s.state, s.updated_date, u.name limit 1');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare fetch source: ' . $this->conn->error);
         }
