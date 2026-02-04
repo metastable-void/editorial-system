@@ -100,6 +100,8 @@ const storageKey = 'editorial:lastAuthorId';
 const appState = {
   users: [],
   selectedAuthorId: null,
+  pageRefresher: null,
+  isRefreshing: false,
 };
 
 function normalizeUsers(users) {
@@ -107,6 +109,84 @@ function normalizeUsers(users) {
     ...user,
     id: Number(user.id),
   }));
+}
+
+function usersMatch(a, b) {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].id !== b[i].id || a[i].name !== b[i].name) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function syncAuthorSelect() {
+  const select = document.querySelector('.author-select select');
+  if (!select) {
+    return;
+  }
+  const selectedValue = select.value;
+  select.innerHTML = '';
+  const defaultOption = createElement('option', { text: '選択してください' });
+  defaultOption.value = '';
+  select.appendChild(defaultOption);
+  appState.users.forEach((user) => {
+    const option = createElement('option', { text: user.name });
+    option.value = String(user.id);
+    if (selectedValue === option.value) {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  });
+}
+
+async function refreshAuthors() {
+  const result = await api.getUsers();
+  const users = normalizeUsers(result.users);
+  if (!usersMatch(users, appState.users)) {
+    appState.users = users;
+    syncAuthorSelect();
+    if ((location.hash || '#/new-source') === '#/users') {
+      renderApp();
+    }
+  }
+}
+
+let refreshTimerId = null;
+
+async function runAutoRefresh() {
+  if (appState.isRefreshing) {
+    return;
+  }
+  appState.isRefreshing = true;
+  try {
+    await refreshAuthors();
+    if (typeof appState.pageRefresher === 'function') {
+      await appState.pageRefresher();
+    }
+  } catch (error) {
+    // Auto refresh should be silent.
+  } finally {
+    appState.isRefreshing = false;
+  }
+}
+
+function startAutoRefresh() {
+  if (refreshTimerId !== null) {
+    return;
+  }
+  refreshTimerId = setInterval(runAutoRefresh, 10000);
+}
+
+function stopAutoRefresh() {
+  if (refreshTimerId === null) {
+    return;
+  }
+  clearInterval(refreshTimerId);
+  refreshTimerId = null;
 }
 
 function sanitizeUrl(raw) {
@@ -559,6 +639,8 @@ function renderNewSourcePage(container) {
     updateButtonStates();
   }
 
+  appState.pageRefresher = null;
+
   [urlInput, titleInput, commentInput].forEach((field) => {
     field.addEventListener('input', () => {
       resetMatches();
@@ -809,6 +891,7 @@ function renderSourcesPage(container) {
     }
   }
 
+  appState.pageRefresher = loadSources;
   loadSources();
   container.appendChild(section);
 }
@@ -922,6 +1005,7 @@ function renderSourceDetailPage(container, sourceId) {
     }
   });
 
+  appState.pageRefresher = loadSource;
   loadSource();
 }
 
@@ -957,6 +1041,7 @@ function renderKeywordListPage(container) {
     }
   }
 
+  appState.pageRefresher = loadKeywords;
   loadKeywords();
   container.appendChild(section);
 }
@@ -1031,6 +1116,7 @@ function renderKeywordDetailPage(container, keyword) {
     }
   }
 
+  appState.pageRefresher = loadAll;
   loadAll();
   container.appendChild(section);
 }
@@ -1114,6 +1200,7 @@ function renderSearchPage(container, query) {
     }
   }
 
+  appState.pageRefresher = loadSearch;
   loadSearch();
   container.appendChild(section);
 }
@@ -1186,12 +1273,14 @@ function renderUserDetailPage(container, userId) {
     }
   }
 
+  appState.pageRefresher = loadCounts;
   loadCounts();
   container.appendChild(section);
 }
 
 function renderRoute(container) {
   const route = location.hash || '#/new-source';
+  appState.pageRefresher = null;
   if (route === '#/users') {
     renderUsersPage(container);
   } else if (route === '#/sources') {
@@ -1291,5 +1380,18 @@ async function init() {
   }
 }
 
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopAutoRefresh();
+    return;
+  }
+  startAutoRefresh();
+  runAutoRefresh();
+});
+
 window.addEventListener('hashchange', renderApp);
-window.addEventListener('load', init);
+window.addEventListener('load', () => {
+  init();
+  startAutoRefresh();
+  runAutoRefresh();
+});
