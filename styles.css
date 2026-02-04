@@ -265,6 +265,10 @@ textarea {
   background: #fffdf9;
 }
 
+.title-input {
+  font-weight: 700;
+}
+
 textarea {
   min-height: 120px;
   resize: vertical;

@@ -357,6 +357,7 @@ function renderNewSourcePage(container) {
   const titleInput = createElement('input');
   titleInput.type = 'text';
   titleInput.placeholder = 'タイトル';
+  titleInput.classList.add('title-input');
   const titlePreview = createElement('div', { className: 'hint' });
   const commentInput = document.createElement('textarea');
   commentInput.placeholder = 'コメント';
@@ -823,6 +824,7 @@ function renderSourceDetailPage(container, sourceId) {
   const titleInput = createElement('input');
   titleInput.type = 'text';
   titleInput.placeholder = 'タイトル';
+  titleInput.classList.add('title-input');
   const commentInput = document.createElement('textarea');
   commentInput.placeholder = 'コメント';
   const contentInput = document.createElement('textarea');
