@@ -250,10 +250,6 @@ h2 {
   gap: 14px;
 }
 
-.hidden {
-  display: none;
-}
-
 .url-row {
   display: flex;
   gap: 12px;
@@ -268,6 +264,14 @@ h2 {
   display: grid;
   gap: 14px;
   margin-top: 16px;
+}
+
+.hidden {
+  display: none;
+}
+
+.source-draft.hidden {
+  display: none;
 }
 
 .author-row {
