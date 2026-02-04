@@ -61,6 +61,18 @@ try {
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     if ($method === 'GET') {
+        $source_id = $_GET['source_id'] ?? null;
+        if (\is_string($source_id) && \is_numeric($source_id)) {
+            $source_id = (int)$source_id;
+        }
+        if (\is_int($source_id) && $source_id > 0) {
+            $source = $model->get_source_by_id($source_id);
+            if ($source === null) {
+                json_response(['error' => 'Not found.'], 404);
+            }
+            json_response(['source' => $source]);
+        }
+
         $url = $_GET['url'] ?? null;
         if (\is_string($url) && \trim($url) !== '') {
             $keywords = parse_keywords($_GET['keywords'] ?? []);
@@ -87,6 +99,7 @@ try {
         $url = $data['url'] ?? null;
         $title = $data['title'] ?? '';
         $comment = $data['comment'] ?? '';
+        $content_md = $data['content_md'] ?? '';
         $keywords = $data['keywords'] ?? [];
         if (!\is_int($author_id)) {
             json_response(['error' => 'Missing or invalid author_id.'], 400);
@@ -97,10 +110,16 @@ try {
         if (!\is_string($title) || !\is_string($comment)) {
             json_response(['error' => 'Invalid title or comment.'], 400);
         }
+        if ($content_md === null) {
+            $content_md = '';
+        }
+        if (!\is_string($content_md)) {
+            json_response(['error' => 'Invalid content_md.'], 400);
+        }
         if (!\is_array($keywords)) {
             json_response(['error' => 'Invalid keywords.'], 400);
         }
-        $source_id = $model->add_source($author_id, $url, $title, $comment, $keywords);
+        $source_id = $model->add_source($author_id, $url, $title, $comment, $content_md, $keywords);
         json_response(['id' => $source_id], 201);
     }
 

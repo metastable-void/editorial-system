@@ -18,6 +18,7 @@ create table if not exists `sources` (
     title varchar(1024) not null default '',
     author_id integer not null,
     comment blob not null default '',
+    content_md mediumblob not null default '',
     state integer not null default 0, -- 0: working, 1: done, -1: aborted/deleted
     updated_date bigint not null default 1769748117,
     constraint `sources_users_id_fk` foreign key  (`author_id`) references `users` (`id`)
@@ -282,18 +283,18 @@ class Model {
     /**
      * Adds a source with state=0, and adds keywords. Returns the source ID.
      */
-    public function add_source(int $author_id, string $url, string $title, string $comment, array $keywords): int {
+    public function add_source(int $author_id, string $url, string $title, string $comment, string $content_md, array $keywords): int {
         if (strlen($comment) > self::COMMENT_BYTES_LIMIT) {
             throw new \RuntimeException('Comment exceeds limit.');
         }
         $this->conn->begin_transaction();
         try {
-            $stmt = $this->conn->prepare('insert into sources (url, title, author_id, comment, state, updated_date) values (?, ?, ?, ?, 0, ?)');
+            $stmt = $this->conn->prepare('insert into sources (url, title, author_id, comment, content_md, state, updated_date) values (?, ?, ?, ?, ?, 0, ?)');
             if (!$stmt) {
                 throw new \RuntimeException('Failed to prepare insert source: ' . $this->conn->error);
             }
             $now = time();
-            $stmt->bind_param('ssisi', $url, $title, $author_id, $comment, $now);
+            $stmt->bind_param('ssissi', $url, $title, $author_id, $comment, $content_md, $now);
             if (!$stmt->execute()) {
                 $stmt->close();
                 throw new \RuntimeException('Failed to insert source: ' . $this->conn->error);
@@ -346,6 +347,26 @@ class Model {
         }
 
         return $source_id;
+    }
+
+    /**
+     * Returns a source row or null.
+     */
+    public function get_source_by_id(int $source_id): ?array {
+        $stmt = $this->conn->prepare('select id, url, title, author_id, comment, content_md, state, updated_date from sources where id = ? limit 1');
+        if (!$stmt) {
+            throw new \RuntimeException('Failed to prepare fetch source: ' . $this->conn->error);
+        }
+        $stmt->bind_param('i', $source_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $source = null;
+        if ($result instanceof \mysqli_result) {
+            $source = $result->fetch_assoc() ?: null;
+            $result->free();
+        }
+        $stmt->close();
+        return $source;
     }
 
     /**
