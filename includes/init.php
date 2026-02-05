@@ -97,3 +97,4 @@ if (!is_cli_request()) {
 
 require_once __DIR__ . '/wordpress.php';
 require_once __DIR__ . '/model.php';
+require_once __DIR__ . '/cron-tasks.php';

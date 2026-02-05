@@ -10,6 +10,7 @@ try {
     }
 
     // Cron logic here
+    Cron::run_all_jobs();
 
     json_response(['success' => true]);
 } catch (\Throwable $error) {
