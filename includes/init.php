@@ -49,11 +49,6 @@ function return_error_response(string $error): never {
 $request_uri = $_SERVER['REQUEST_URI'] ?? '';
 $is_api_request = \is_string($request_uri) && \strpos($request_uri, '/api/') === 0;
 
-if ($is_api_request && !ONLINE) {
-    json_response(['error' => 'API disabled'], 503);
-    exit;
-}
-
 if (!is_cli_request()) {
     if ($is_api_request) {
         send_header('Access-Control-Allow-Origin: *');
@@ -74,6 +69,11 @@ if (!\is_file(__DIR__ . '/config.php')) {
 }
 
 require_once __DIR__ . '/config.php';
+
+if ($is_api_request && !ONLINE) {
+    json_response(['error' => 'API disabled'], 503);
+    exit;
+}
 
 if (!is_cli_request()) {
     $login = Config::getAdminLogin();
