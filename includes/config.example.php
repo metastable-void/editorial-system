@@ -13,6 +13,9 @@ require_once __DIR__ . '/config-schema.php';
 
 // 設定はこの下に書くこと (PHP8)
 
+// switch to false to disable APIs
+const ONLINE = true;
+
 class Config extends ConfigSchema {
     public static function getMysqlConfig(): MysqlConfig
     {

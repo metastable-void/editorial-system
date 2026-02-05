@@ -17,8 +17,8 @@ create table if not exists `sources` (
     url varchar(2048) not null,
     title varchar(1024) not null default '',
     author_id integer not null,
-    comment blob not null default '',
-    content_md mediumblob not null default '',
+    comment mediumtext not null default '',
+    content_md mediumtext not null default '',
     state integer not null default 0, -- 0: working, 1: done, -1: aborted/deleted
     updated_date bigint not null default 1769748117,
     constraint `sources_users_id_fk` foreign key  (`author_id`) references `users` (`id`)
@@ -27,17 +27,35 @@ create table if not exists `sources` (
 create index if not exists `sources_author_index` on `sources` (`author_id`);
 create index if not exists `sources_state_index` on `sources` (`state`);
 create index if not exists `sources_url_index` on `sources` (`url`);
+create index if not exists `sources_title_index` on `sources` (`title`);
 
-create table if not exists `sources_keywords` (
+-- create table if not exists `sources_keywords` (
+--     id integer primary key auto_increment,
+--     keyword varchar(255) not null, -- not unique
+--     source_id integer not null,
+--     constraint `sources_keywords_source_id_fk` foreign key (`source_id`) references `sources` (`id`)
+-- );
+
+-- create index if not exists `sources_keywords_source_id_index` on `sources_keywords` (`source_id`);
+-- create index if not exists `sources_keywords_keyword_index` on `sources_keywords` (`keyword`);
+
+create table if not exists `keywords` (
     id integer primary key auto_increment,
-    keyword varchar(255) not null, -- not unique
-    source_id integer not null,
-    constraint `sources_keywords_source_id_fk` foreign key (`source_id`) references `sources` (`id`)
+    keyword varchar(255) not null unique
 );
 
-create index if not exists `sources_title_index` on `sources` (`title`);
-create index if not exists `sources_keywords_source_id_index` on `sources_keywords` (`source_id`);
-create index if not exists `sources_keywords_keyword_index` on `sources_keywords` (`keyword`);
+create unique index if not exists `keywords_keyword_index` on `keywords` (`keyword`);
+
+create table if not exists `sources_keywords_v2` (
+    id integer primary key auto_increment,
+    source_id integer not null,
+    keyword_id integer not null,
+    constraint `sources_keywords_v2_source_id_fk` foreign key (`source_id`) references `sources` (`id`),
+    constraint `sources_keywords_v2_keyword_id_fk` foreign key (`keyword_id`) references `keywords` (`id`)
+);
+
+create index if not exists `sources_keywords_v2_source_id_index` on `sources_keywords_v2` (`source_id`);
+create index if not exists `sources_keywords_v2_keyword_id_index` on `sources_keywords_v2` (`keyword_id`);
 
 SQL;
 
@@ -81,7 +99,7 @@ class Model {
         ];
 
         $state_value = $state->value;
-        $stmt = $this->conn->prepare('select s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.url = ? and s.state = ? group by s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name order by s.id desc limit 1');
+        $stmt = $this->conn->prepare('select s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct k.keyword order by k.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords_v2 sk on sk.source_id = s.id left join keywords k on k.id = sk.keyword_id where s.url = ? and s.state = ? group by s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name order by s.id desc limit 1');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare URL query: ' . $this->conn->error);
         }
@@ -105,11 +123,12 @@ class Model {
         }
 
         $placeholders = implode(',', array_fill(0, count($keywords), '?'));
-        $sql = "select s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator ',') as keywords
+        $sql = "select s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct k.keyword order by k.keyword separator ',') as keywords
             from sources s
             join users u on u.id = s.author_id
-            join sources_keywords sk on sk.source_id = s.id
-            where sk.keyword in ($placeholders) and s.state = ?
+            join sources_keywords_v2 sk on sk.source_id = s.id
+            join keywords k on k.id = sk.keyword_id
+            where k.keyword in ($placeholders) and s.state = ?
             group by s.id, s.title, s.url, s.comment, s.author_id, s.updated_date, u.name
             order by s.id desc";
         $stmt = $this->conn->prepare($sql);
@@ -319,18 +338,16 @@ class Model {
             }
 
             if ($filtered) {
-                $placeholders = implode(',', array_fill(0, count($filtered), '(?, ?)'));
-                $sql = "insert into sources_keywords (keyword, source_id) values {$placeholders}";
+                $placeholders = implode(',', array_fill(0, count($filtered), '(?)'));
+                $sql = "insert ignore into keywords (keyword) values {$placeholders}";
                 $stmt = $this->conn->prepare($sql);
                 if (!$stmt) {
                     throw new \RuntimeException('Failed to prepare insert keywords: ' . $this->conn->error);
                 }
-                $types = str_repeat('si', count($filtered));
+                $types = str_repeat('s', count($filtered));
                 $bind_params = [$types];
-                $source_ids = array_fill(0, count($filtered), $source_id);
                 foreach ($filtered as $index => $keyword) {
                     $bind_params[] = &$filtered[$index];
-                    $bind_params[] = &$source_ids[$index];
                 }
                 $stmt->bind_param(...$bind_params);
                 if (!$stmt->execute()) {
@@ -338,6 +355,53 @@ class Model {
                     throw new \RuntimeException('Failed to insert keywords: ' . $this->conn->error);
                 }
                 $stmt->close();
+
+                $placeholders = implode(',', array_fill(0, count($filtered), '?'));
+                $sql = "select id, keyword from keywords where keyword in ({$placeholders})";
+                $stmt = $this->conn->prepare($sql);
+                if (!$stmt) {
+                    throw new \RuntimeException('Failed to prepare select keyword ids: ' . $this->conn->error);
+                }
+                $types = str_repeat('s', count($filtered));
+                $bind_params = [$types];
+                foreach ($filtered as $index => $keyword) {
+                    $bind_params[] = &$filtered[$index];
+                }
+                $stmt->bind_param(...$bind_params);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $keyword_ids = [];
+                if ($result instanceof \mysqli_result) {
+                    while ($row = $result->fetch_assoc()) {
+                        if (isset($row['id'])) {
+                            $keyword_ids[] = (int)$row['id'];
+                        }
+                    }
+                    $result->free();
+                }
+                $stmt->close();
+
+                if ($keyword_ids) {
+                    $placeholders = implode(',', array_fill(0, count($keyword_ids), '(?, ?)'));
+                    $sql = "insert into sources_keywords_v2 (source_id, keyword_id) values {$placeholders}";
+                    $stmt = $this->conn->prepare($sql);
+                    if (!$stmt) {
+                        throw new \RuntimeException('Failed to prepare insert source keywords: ' . $this->conn->error);
+                    }
+                    $types = str_repeat('ii', count($keyword_ids));
+                    $bind_params = [$types];
+                    $source_ids = array_fill(0, count($keyword_ids), $source_id);
+                    foreach ($keyword_ids as $index => $keyword_id) {
+                        $bind_params[] = &$source_ids[$index];
+                        $bind_params[] = &$keyword_ids[$index];
+                    }
+                    $stmt->bind_param(...$bind_params);
+                    if (!$stmt->execute()) {
+                        $stmt->close();
+                        throw new \RuntimeException('Failed to insert source keywords: ' . $this->conn->error);
+                    }
+                    $stmt->close();
+                }
             }
 
             $this->conn->commit();
@@ -353,7 +417,7 @@ class Model {
      * Returns a source row or null.
      */
     public function get_source_by_id(int $source_id): ?array {
-        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.author_id, s.comment, s.content_md, s.state, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.id = ? group by s.id, s.url, s.title, s.author_id, s.comment, s.content_md, s.state, s.updated_date, u.name limit 1');
+        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.author_id, s.comment, s.content_md, s.state, s.updated_date, u.name as author_name, group_concat(distinct k.keyword order by k.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords_v2 sk on sk.source_id = s.id left join keywords k on k.id = sk.keyword_id where s.id = ? group by s.id, s.url, s.title, s.author_id, s.comment, s.content_md, s.state, s.updated_date, u.name limit 1');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare fetch source: ' . $this->conn->error);
         }
@@ -394,7 +458,7 @@ class Model {
      * [{"id": ..., "url": "...", "title": "...", "comment": "...", "state": ..., "author_id": ..., "author_name": "..."}, ...]
      */
     public function get_sources(int $author_id, SourceState $state): array {
-        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct sk.keyword order by sk.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords sk on sk.source_id = s.id where s.author_id = ? and s.state = ? group by s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name order by s.id desc limit 1000');
+        $stmt = $this->conn->prepare('select s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name as author_name, group_concat(distinct k.keyword order by k.keyword separator \',\') as keywords from sources s join users u on u.id = s.author_id left join sources_keywords_v2 sk on sk.source_id = s.id left join keywords k on k.id = sk.keyword_id where s.author_id = ? and s.state = ? group by s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name order by s.id desc limit 1000');
         if (!$stmt) {
             throw new \RuntimeException('Failed to prepare fetch sources: ' . $this->conn->error);
         }
@@ -425,14 +489,16 @@ class Model {
 
         $placeholders = implode(',', array_fill(0, count($keywords), '?'));
         $sql = "select s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name as author_name,
-                group_concat(distinct sk_all.keyword order by sk_all.keyword separator ',') as keywords,
-                group_concat(distinct sk_match.keyword order by sk_match.keyword separator ',') as matched_keywords,
-                count(distinct sk_match.keyword) as match_count
+                group_concat(distinct k_all.keyword order by k_all.keyword separator ',') as keywords,
+                group_concat(distinct k_match.keyword order by k_match.keyword separator ',') as matched_keywords,
+                count(distinct k_match.keyword) as match_count
             from sources s
             join users u on u.id = s.author_id
-            join sources_keywords sk_match on sk_match.source_id = s.id
-            left join sources_keywords sk_all on sk_all.source_id = s.id
-            where sk_match.keyword in ($placeholders) and s.state = ?
+            join sources_keywords_v2 sk_match on sk_match.source_id = s.id
+            join keywords k_match on k_match.id = sk_match.keyword_id
+            left join sources_keywords_v2 sk_all on sk_all.source_id = s.id
+            left join keywords k_all on k_all.id = sk_all.keyword_id
+            where k_match.keyword in ($placeholders) and s.state = ?
             group by s.id, s.url, s.title, s.comment, s.state, s.author_id, s.updated_date, u.name
             order by match_count desc, s.id desc
             limit 1000";
@@ -550,7 +616,7 @@ class Model {
      * [{"keyword": "...", "count": ...}, ...]
      */
     public function get_unique_keywords(): array {
-        $result = $this->conn->query('select sk.keyword, count(distinct sk.source_id) as count from sources_keywords sk join sources s on s.id = sk.source_id where s.state >= 0 group by sk.keyword order by count desc, sk.keyword limit 1000');
+        $result = $this->conn->query('select k.keyword, count(distinct sk.source_id) as count from sources_keywords_v2 sk join keywords k on k.id = sk.keyword_id join sources s on s.id = sk.source_id where s.state >= 0 group by k.keyword order by count desc, k.keyword limit 1000');
         if (!$result) {
             throw new \RuntimeException('Failed to fetch keywords: ' . $this->conn->error);
         }
@@ -580,8 +646,9 @@ class Model {
         }
         $sql = 'select s.state, count(distinct s.id) as count
             from sources s
-            join sources_keywords sk on sk.source_id = s.id
-            where sk.keyword = ?
+            join sources_keywords_v2 sk on sk.source_id = s.id
+            join keywords k on k.id = sk.keyword_id
+            where k.keyword = ?
             group by s.state';
         $stmt = $this->conn->prepare($sql);
         if (!$stmt) {
