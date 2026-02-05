@@ -29,16 +29,6 @@ create index if not exists `sources_state_index` on `sources` (`state`);
 create index if not exists `sources_url_index` on `sources` (`url`);
 create index if not exists `sources_title_index` on `sources` (`title`);
 
--- create table if not exists `sources_keywords` (
---     id integer primary key auto_increment,
---     keyword varchar(255) not null, -- not unique
---     source_id integer not null,
---     constraint `sources_keywords_source_id_fk` foreign key (`source_id`) references `sources` (`id`)
--- );
-
--- create index if not exists `sources_keywords_source_id_index` on `sources_keywords` (`source_id`);
--- create index if not exists `sources_keywords_keyword_index` on `sources_keywords` (`keyword`);
-
 create table if not exists `keywords` (
     id integer primary key auto_increment,
     keyword varchar(255) not null unique
