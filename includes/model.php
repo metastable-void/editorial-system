@@ -47,6 +47,8 @@ create table if not exists `sources_keywords_v2` (
 create index if not exists `sources_keywords_v2_source_id_index` on `sources_keywords_v2` (`source_id`);
 create index if not exists `sources_keywords_v2_keyword_id_index` on `sources_keywords_v2` (`keyword_id`);
 
+create unique index if not exists `sources_keywords_v2_unique_pair` on `sources_keywords_v2` (`source_id`, `keyword_id`);
+
 SQL;
 
 enum SourceState: int {
